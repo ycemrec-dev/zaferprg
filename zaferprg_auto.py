@@ -1639,26 +1639,6 @@ if st.session_state["auto_run_trigger"] or manual_run:
     taraf_k_str = f"<b>Kelly Kasa: %{kelly_taraf:.1f}</b>" if kelly_taraf > 0 else '<span style="color:#fbbf24;">Kelly Kasa: %0.0 (Pas Geç)</span>'
     goal_k_str = f"<b>Kelly Kasa: %{kelly_goal:.1f}</b>" if kelly_goal > 0 else '<span style="color:#fbbf24;">Kelly Kasa: %0.0 (Pas Geç)</span>'
     total_k_str = f"%{total_kelly:.1f}" if total_kelly > 0 else "%0.0 (PAS GEÇ - DEĞER ORANI YOK)"
+st.markdown(f'<div class="consensus-box"><div class="consensus-title">👑 {home_team.upper()} - {away_team.upper()} 👑<br><span style="font-size:11px; color:#fff; font-weight:normal;">ÜÇLÜ SENTEZ MÜHRÜ (M1 + M2 + KELLY // BAREM {gl_str})</span></div>📌 <b>1. Taraf Mührü:</b> {m1_taraf_pick} (Güven: %{m1_taraf_conf}) ➔ {taraf_k_str}<br>⚽ <b>2. Gol Mührü:</b> {final_goal_pick} (Net Güven: %{final_goal_conf}) ➔ {goal_k_str} {goal_badge}<br>🔥 <b>3. KG Mührü:</b> {final_btts_pick} (Net Güven: %{final_btts_conf}) {btts_badge}<br>⏱️ <b>4. İlk Yarı Gol Mührü:</b> {final_ht05_pick} (Net Güven: %{final_ht05_conf})<br>⏳ <b>5. İlk Yarı Taraf Mührü:</b> {final_ht_pick} (Net Güven: %{final_ht_conf})<br>🏆 <b>6. Nihai Skor Çifti:</b> {score_matrix[0]["home"]}-{score_matrix[0]["away"]} veya {score_matrix[1]["home"]}-{score_matrix[1]["away"]}{alert_blocks}<div class="seal-footer">🔒 ÜÇLÜ KANTİTATİF GÜVEN MÜHRÜ: %{true_conf}<br>💼 ÖNERİLEN TOPLAM OPTİMAL KASA RİSKİ (KELLY): {total_k_str}</div></div>', unsafe_allow_html=True)
+    
 
-    st.markdown(
-        f"""
-        <div class="consensus-box">
-            <div class="consensus-title">👑 {home_team.upper()} - {away_team.upper()} 👑<br>
-            <span style="font-size:11px; color:#fff; font-weight:normal;">ÜÇLÜ SENTEZ MÜHRÜ (M1 + M2 + KELLY // BAREM {gl_str})</span></div>
-            📌 <b>1. Taraf Mührü:</b> {m1_taraf_pick} (Güven: %{m1_taraf_conf}) ➔ {taraf_k_str}<br>
-            ⚽ <b>2. Gol Mührü:</b> {final_goal_pick} (Net Güven: %{final_goal_conf}) ➔ {goal_k_str} {goal_badge}<br>
-            🔥 <b>3. KG Mührü:</b> {final_btts_pick} (Net Güven: %{final_btts_conf}) {btts_badge}<br>
-            ⏱️ <b>4. İlk Yarı Gol Mührü:</b> {final_ht05_pick} (Net Güven: %{final_ht05_conf})<br>
-            ⏳ <b>5. İlk Yarı Taraf Mührü:</b> {final_ht_pick} (Net Güven: %{final_ht_conf})<br>
-            🏆 <b>6. Nihai Skor Çifti:</b> {score_matrix[0]['home']}-{score_matrix[0]['away']} veya {score_matrix[1]['home']}-{score_matrix[1]['away']}
-            {alert_blocks}
-            <div class="seal-footer">
-                🔒 ÜÇLÜ KANTİTATİF GÜVEN MÜHRÜ: %{true_conf}<br>
-                💼 ÖNERİLEN TOPLAM OPTİMAL KASA RİSKİ (KELLY): {total_k_str}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-st.stop()
