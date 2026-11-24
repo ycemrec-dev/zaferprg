@@ -1659,4 +1659,4 @@ if st.session_state["auto_run_trigger"] or manual_run:
         </div>
         """,
         unsafe_allow_html=True,
-  )
+    )
