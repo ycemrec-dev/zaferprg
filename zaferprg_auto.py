@@ -1,1602 +1,1327 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zaferopta Quant Pro V36.1</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        :root {
-            --bg-color: #05080f;
-            --card-bg: #0f172a;
-            --accent-cyan: #00f3ff;
-            --accent-green: #00ff66;
-            --accent-orange: #ff9900;
-            --accent-red: #ff3366;
-            --accent-purple: #a855f7;
-            --accent-yellow: #eab308;
-            --accent-blue: #3b82f6;
-            --accent-pink: #ec4899;
-            --accent-teal: #14b8a6;
-            --accent-gold: #ffd700;
-            --accent-rose: #f43f5e;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --border-color: #1e293b;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-main); padding: 12px; }
-        .container { max-width: 650px; margin: 0 auto; }
-        
-        .header {
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            border: 1px solid var(--accent-gold);
-            border-radius: 12px;
-            padding: 18px;
-            text-align: center;
-            margin-bottom: 15px;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
-        }
-        .header h1 { color: var(--accent-gold); font-size: 20px; letter-spacing: 1.5px; margin-bottom: 4px; }
-        .header p { color: var(--accent-cyan); font-size: 11px; text-transform: uppercase; font-weight: bold; }
+import io
+import math
+import re
+import unicodedata
+import requests
+import pandas as pd
+import streamlit as st
 
-        .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 14px;
-            margin-bottom: 12px;
-        }
-        .card label { display: block; font-size: 12px; color: var(--accent-cyan); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; }
-        .hint-txt { font-size: 10px; color: var(--text-muted); margin-top: -4px; margin-bottom: 8px; line-height: 1.35; }
-        
-        input[type="text"], input[type="password"], input[type="file"], input[type="number"], select {
-            width: 100%;
-            padding: 11px;
-            background-color: #080e1a;
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            border-radius: 6px;
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
-        input[type="file"] { padding: 7px; cursor: pointer; }
-        select {
-            border-color: var(--accent-cyan);
-            color: var(--accent-gold);
-            font-weight: bold;
-            text-align: center;
-            cursor: pointer;
-        }
-        .status-msg { font-size: 12px; font-weight: bold; margin-bottom: 8px; line-height: 1.4; }
-        
-        .api-box {
-            background: rgba(168, 85, 247, 0.07);
-            border: 1px dashed rgba(168, 85, 247, 0.45);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-        }
-        .api-box label { color: var(--accent-purple); font-size: 11px; margin-bottom: 6px; text-align: center; font-weight: bold; }
-        .btn-api {
-            width: 100%;
-            padding: 10px;
-            background: linear-gradient(135deg, #a855f7, #6366f1);
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-            box-shadow: 0 3px 12px rgba(168, 85, 247, 0.3);
-        }
-        .api-status { font-size: 11px; text-align: center; color: var(--text-muted); min-height: 16px; line-height: 1.4; }
+st.set_page_config(
+    page_title="Zaferopta Quant Pro V36.1",
+    page_icon="👑",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
 
-        .manual-input-box {
-            background: rgba(244, 63, 94, 0.05);
-            border: 1px dashed rgba(244, 63, 94, 0.4);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-        }
-        .odds-input-box {
-            background: rgba(0, 243, 255, 0.04);
-            border: 1px dashed rgba(0, 243, 255, 0.35);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-        }
-        .manual-input-box label, .odds-input-box label { font-size: 11px; margin-bottom: 6px; display: block; text-align: center; font-weight: bold; }
-        .input-row { display: flex; gap: 6px; margin-bottom: 6px; }
-        .input-row input, .input-row select { margin-bottom: 0; padding: 8px 4px; font-size: 12px; text-align: center; flex: 1; }
-        .input-row select { flex: 1.25; }
-
-        button.btn-main {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #ffd700, #ff9900);
-            color: #000;
-            border: none;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.35);
-        }
-        button:active { transform: scale(0.98); }
-
-        .warn-banner {
-            background: rgba(255, 153, 0, 0.12);
-            border: 1px solid var(--accent-orange);
-            color: var(--accent-orange);
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            margin-bottom: 12px;
-            display: none;
-            line-height: 1.5;
-        }
-
-        .loading { text-align: center; color: var(--accent-gold); font-weight: bold; margin: 15px 0; display: none; font-size: 14px; }
-        .results { display: none; }
-        
-        .engine-box {
-            background-color: #0b1120;
-            border-left: 4px solid var(--accent-cyan);
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 6px;
-            font-size: 13px;
-            line-height: 1.6;
-        }
-        .engine-box.m1 { border-left-color: var(--accent-cyan); }
-        .engine-box.m2 { border-left-color: var(--accent-green); }
-        .engine-box.m3 { border-left-color: var(--accent-orange); }
-        .engine-box.m4 { border-left-color: var(--accent-red); }
-        .engine-box.m5 { border-left-color: var(--accent-purple); }
-        .engine-box.m6 { border-left-color: var(--accent-yellow); }
-        .engine-box.m7 { border-left-color: var(--accent-blue); }
-        .engine-box.m8 { border-left-color: var(--accent-pink); }
-        .engine-box.m9 { border-left-color: var(--accent-teal); }
-        .engine-box.m10 { border-left-color: var(--accent-gold); }
-        .engine-box.m11 { border-left-color: var(--accent-teal); background: linear-gradient(180deg, #0b1120, #041219); border: 1px solid rgba(20, 184, 166, 0.3); }
-        .engine-box.m12 { border-left-color: var(--accent-red); background: linear-gradient(90deg, #0b1120, #1a0808); border: 1px solid rgba(255, 51, 102, 0.3); }
-        
-        .engine-box h3 { font-size: 13px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .engine-box.m11 h3 { color: var(--accent-teal); text-align: center; border-bottom: 1px solid rgba(20, 184, 166, 0.3); padding-bottom: 8px; margin-bottom: 10px; }
-        .engine-box.m12 h3 { color: var(--accent-red); font-weight: bold; letter-spacing: 0.8px; }
-
-        .opta-table { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 1.4; }
-        .opta-table th { background-color: rgba(19, 27, 46, 0.8); padding: 8px 6px; text-align: left; color: var(--accent-teal); border-bottom: 1px solid var(--border-color); font-size: 10px; }
-        .opta-table td { padding: 8px 6px; border-bottom: 1px solid rgba(30, 41, 59, 0.6); color: var(--text-main); vertical-align: middle; }
-        .opta-table tr:last-child td { border-bottom: none; }
-        .opta-badge { background: #064e3b; color: var(--accent-green); padding: 3px 6px; border-radius: 4px; font-weight: bold; border: 1px solid var(--accent-green); display: inline-block; text-align: center; font-size: 10px; }
-        .opta-weight { color: var(--accent-gold); font-weight: bold; text-align: center; font-size: 11px; }
-        .opta-final-row td { background-color: rgba(0, 255, 102, 0.08); font-weight: bold; border-top: 2px solid var(--accent-green); }
-        .opta-final-title { color: var(--accent-green); font-size: 11px; }
-
-        .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
-        .score-item { background: #131b2e; border: 1px solid var(--border-color); padding: 7px; text-align: center; border-radius: 5px; }
-        .score-item .sc { font-weight: bold; color: var(--accent-cyan); font-size: 14px; }
-        .score-item .pr { font-size: 11px; color: var(--text-muted); }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 6px; }
-        .stat-card { background: #131b2e; padding: 7px; border-radius: 5px; text-align: center; border: 1px solid var(--border-color); }
-        .stat-card .val { font-size: 13px; font-weight: bold; color: var(--accent-green); }
-        .stat-card .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
-
-        .m1-predictions { margin-top: 10px; background: #080e1a; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.6; }
-
-        .m12-content { background: #080e1a; border: 1px solid rgba(255, 51, 102, 0.2); padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.8; }
-        .m12-subtit { color: var(--accent-cyan); font-weight: bold; margin-top: 4px; display: block; }
-
-        .consensus {
-            background: linear-gradient(135deg, #064e3b, #022c22);
-            border: 2px solid var(--accent-gold);
-            padding: 16px;
-            border-radius: 10px;
-            margin-top: 16px;
-            box-shadow: 0 0 25px rgba(255, 215, 0, 0.25);
-        }
-        .consensus h2 { color: var(--accent-gold); font-size: 16px; margin-bottom: 12px; text-align: center; letter-spacing: 0.5px; line-height: 1.4; }
-        .consensus-list { font-size: 13px; color: #fff; line-height: 1.9; text-align: left; }
-        .seal-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 4px; vertical-align: middle; }
-        .seal-triple { background: var(--accent-gold); color: #000; }
-        .seal-ok { background: var(--accent-green); color: #000; }
-        .seal-diff { background: var(--accent-orange); color: #000; }
-        .seal-pass { background: var(--accent-red); color: #fff; }
-        .pas-text { color: #fbbf24; font-weight: bold; }
-        .def-alert {
-            margin-top: 10px;
-            padding: 8px;
-            border-radius: 6px;
-            background: rgba(0, 243, 255, 0.12);
-            border: 1px solid var(--accent-cyan);
-            color: #e0f2fe;
-            font-size: 12px;
-            line-height: 1.45;
-        }
-        .backbone-alert {
-            margin-top: 10px;
-            padding: 8px;
-            border-radius: 6px;
-            background: rgba(168, 85, 247, 0.16);
-            border: 1px solid var(--accent-purple);
-            color: #f3e8ff;
-            font-size: 12px;
-            line-height: 1.45;
-        }
-        .caution-alert {
-            margin-top: 10px;
-            padding: 8px;
-            border-radius: 6px;
-            background: rgba(255, 153, 0, 0.16);
-            border: 1px solid var(--accent-orange);
-            color: #fef3c7;
-            font-size: 12px;
-            line-height: 1.45;
-        }
-        .radar-alert {
-            margin-top: 10px;
-            padding: 9px;
-            border-radius: 6px;
-            background: rgba(255, 215, 0, 0.15);
-            border: 1px solid var(--accent-gold);
-            color: #fef08a;
-            font-size: 12px;
-            line-height: 1.5;
-        }
-        .seal-footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255, 215, 0, 0.35); text-align: center; font-size: 13px; color: var(--accent-gold); font-weight: bold; line-height: 1.6; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <div class="header">
-        <h1>ZAFEROPTA QUANT PRO</h1>
-        <p>V36.1 // Omurga Çöküşü + Kilit Oyun Kurucu + +EV Radarı</p>
-    </div>
-
-    <div class="card">
-        <label>1. 75 SÜTUNLU ARŞİV EXCEL (.XLSX)</label>
-        <input type="file" id="excelFile" accept=".xlsx, .xls">
-        <div id="fileStatus" class="status-msg" style="color: var(--accent-orange);">⚠️ Arşiv dosyası bekleniyor...</div>
-        
-        <label>2. MAÇ ANALİZİ (EV SAHİBİ - DEPLASMAN)</label>
-        <input type="text" id="matchInput" placeholder="Örn: Chelsea - Leeds United">
-
-        <!-- CANLI GEMINI API SAKAT / CEZALI TARAMA -->
-        <div class="api-box">
-            <label>🤖 CANLI SAKAT & CEZALI TARAMA (GEMINI API)</label>
-            <input type="password" id="geminiApiKey" placeholder="Google AI Studio API Anahtarını yapıştır">
-            <button type="button" class="btn-api" onclick="fetchInjuriesViaAPI()">🔍 SAKAT / CEZALILARI İNTERNETTEN TARA</button>
-            <div id="apiStatus" class="api-status">Anahtar bir kez girildiğinde cihazda saklanır.</div>
-        </div>
-
-        <label>3. EV SAHİBİ SAKAT / CEZALI OYUNCULAR</label>
-        <input type="text" id="homeInjuries" placeholder="Örn: Alan Patrick kilit orta saha, Bernabei bek, Rochet kaleci">
-
-        <label>4. DEPLASMAN SAKAT / CEZALI OYUNCULAR</label>
-        <input type="text" id="awayInjuries" placeholder="Örn: Matty Cash bek, Matteo Ruggeri bek">
-        <div class="hint-txt">💡 2+ stoper/bek <b>Savunma Çöküşü</b>; 1 savunma + 1 kaleci veya 3+ ilk 11 farkı <b>Omurga Çöküşü</b> tetikler. Ana tercih Pas Geç olursa <b>+EV Radarı</b> sürpriz değeri gösterir.</div>
-
-        <!-- GOALOO XG / XGA GİRİŞ KUTULARI -->
-        <div class="manual-input-box">
-            <label style="color: var(--accent-rose);">5. GOALOO XG & XGA MANUEL GİRİŞİ (GOL PAZARLARI & POISSON)</label>
-            <div class="input-row">
-                <input type="number" step="0.01" id="gHomeXg" placeholder="Ev Attack xG">
-                <input type="number" step="0.01" id="gHomeXga" placeholder="Ev Defence xGA">
-            </div>
-            <div class="input-row">
-                <input type="number" step="0.01" id="gAwayXg" placeholder="Dep Attack xG">
-                <input type="number" step="0.01" id="gAwayXga" placeholder="Dep Defence xGA">
-            </div>
-        </div>
-
-        <!-- PİYASA ORANLARI VE ÇOKLU GOL BAREMİ -->
-        <div class="odds-input-box">
-            <label style="color: var(--accent-cyan);">6. GÜNCEL PİYASA ORANLARI & GOL BAREMİ (+EV & KELLY)</label>
-            <div class="input-row">
-                <input type="number" step="0.01" id="oddMs1" placeholder="MS 1">
-                <input type="number" step="0.01" id="oddMs0" placeholder="MS 0">
-                <input type="number" step="0.01" id="oddMs2" placeholder="MS 2">
-            </div>
-            <div class="input-row">
-                <select id="goalLineSelect" onchange="updateGoalOddPlaceholder()">
-                    <option value="2.5" selected>Barem: 2.5</option>
-                    <option value="3.5">Barem: 3.5</option>
-                    <option value="4.5">Barem: 4.5</option>
-                    <option value="1.5">Barem: 1.5</option>
-                </select>
-                <input type="number" step="0.01" id="oddGoalOver" placeholder="2.5 ÜST Oranı">
-                <input type="number" step="0.01" id="oddGoalUnder" placeholder="2.5 ALT (Ops.)">
-            </div>
-        </div>
-        
-        <button type="button" class="btn-main" onclick="runAllEngines()">TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR</button>
-    </div>
-
-    <div class="loading" id="loadingText">12 Aktif Motor V36.1 omurga & +EV radarıyla hesaplanıyor...</div>
-    <div class="warn-banner" id="warnBanner"></div>
-
-    <div class="results" id="resultsArea">
-        <div class="engine-box m1">
-            <h3>Motor 1: Gerçek Dixon-Coles (ρ=-0.13), xG & Pazarlar</h3>
-            <p id="m1Text">-</p>
-            <div class="score-grid" id="scoreGrid"></div>
-            <div class="m1-predictions" id="m1PredictionsText">-</div>
-        </div>
-
-        <div class="engine-box m2">
-            <h3>Motor 2: Excel Arşiv & İç/Dış Saha Sonuçları</h3>
-            <p id="m2Text">-</p>
-            <div class="stats-grid" id="statsGrid"></div>
-            <div class="m1-predictions" id="m2HtText" style="margin-top: 8px; text-align: center;">-</div>
-        </div>
-
-        <div class="engine-box m3">
-            <h3 style="color: var(--accent-orange);">Motor 3: Adil Oran vs Piyasa Sapması</h3>
-            <p id="m3Text">-</p>
-        </div>
-
-        <div class="engine-box m4">
-            <h3 style="color: var(--accent-red);">Motor 4: +EV Değer Oran (Value Bet) Tespiti</h3>
-            <p id="m4Text">-</p>
-        </div>
-
-        <div class="engine-box m5">
-            <h3 style="color: var(--accent-purple);">Motor 5: Savunma & Omurga Kadro Analizi + EWMA</h3>
-            <p id="m5Text">-</p>
-        </div>
-
-        <div class="engine-box m6">
-            <h3 style="color: var(--accent-yellow);">Motor 6: Asya Handikap Olasılık Matrisi</h3>
-            <p id="m6Text">-</p>
-        </div>
-
-        <div class="engine-box m7">
-            <h3 style="color: var(--accent-blue);">Motor 7: Maç Temposu & Disiplin/Kart Riski</h3>
-            <p id="m7Text">-</p>
-        </div>
-
-        <div class="engine-box m8">
-            <h3 style="color: var(--accent-pink);">Motor 8: Ev/Deplasman Saha Üstünlüğü & İstikrar</h3>
-            <p id="m8Text">-</p>
-        </div>
-
-        <div class="engine-box m9">
-            <h3 style="color: var(--accent-teal);">Motor 9: Poisson Canlı Bahis (In-Play) Senaryoları</h3>
-            <p id="m9Text">-</p>
-        </div>
-
-        <div class="engine-box m10">
-            <h3 style="color: var(--accent-gold);">Motor 10: Kelly Criterion Kasa & Risk Yönetimi</h3>
-            <p id="m10Text">-</p>
-        </div>
-
-        <div class="engine-box m11">
-            <h3>Motor 11: Dinamik 5 Katmanlı Opta Sentez Matrisi</h3>
-            <table class="opta-table">
-                <thead>
-                    <tr>
-                        <th style="width: 28%;">Modül & Katman</th>
-                        <th style="width: 44%;">Gerçek Saha / Arşiv Bulgusu</th>
-                        <th style="width: 18%; text-align: center;">Yönelim</th>
-                        <th style="width: 10%; text-align: center;">Dinamik Ağırlık</th>
-                    </tr>
-                </thead>
-                <tbody id="optaTableBody"></tbody>
-            </table>
-        </div>
-
-        <div class="engine-box m12">
-            <h3>MOTOR 12: GOALOO ANALİZİ (FORM, HÜCUM, SAVUNMA)</h3>
-            <div class="m12-content" id="m12Text">-</div>
-        </div>
-
-        <div class="consensus">
-            <h2 id="consensusTitle">👑 ÜÇLÜ SENTEZ MÜHRÜ (M1 + M2 + KELLY)</h2>
-            <div class="consensus-list" id="consensusText">-</div>
-            <div class="seal-footer" id="sealFooter">-</div>
-        </div>
-    </div>
-</div>
-
-<script>
-let excelData = null;
-let colMap = { home: '', away: '', msScore: '', htScore: '', homeGoal: '', awayGoal: '' };
-
-function updateGoalOddPlaceholder() {
-    let gl = document.getElementById('goalLineSelect').value;
-    document.getElementById('oddGoalOver').placeholder = `${gl} ÜST Oranı`;
-    document.getElementById('oddGoalUnder').placeholder = `${gl} ALT (Ops.)`;
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-    updateGoalOddPlaceholder();
-    try {
-        let savedKey = localStorage.getItem('zaferopta_gemini_key');
-        if (savedKey) {
-            document.getElementById('geminiApiKey').value = savedKey;
-            document.getElementById('apiStatus').style.color = 'var(--accent-green)';
-            document.getElementById('apiStatus').innerText = '✔ Kayıtlı API anahtarı hazır.';
-        }
-    } catch (e) {}
-});
-
-document.getElementById('geminiApiKey').addEventListener('change', function() {
-    try { localStorage.setItem('zaferopta_gemini_key', this.value.trim()); } catch (e) {}
-});
-
-function normText(str) {
-    if (str === undefined || str === null) return '';
-    return str.toString()
-        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
-        .replace(/Ş/g, 's').replace(/ş/g, 's')
-        .replace(/Ğ/g, 'g').replace(/ğ/g, 'g')
-        .replace(/Ü/g, 'u').replace(/ü/g, 'u')
-        .replace(/Ö/g, 'o').replace(/ö/g, 'o')
-        .replace(/Ç/g, 'c').replace(/ç/g, 'c')
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function stripGenericWords(normStr) {
-    const stop = new Set(['fc', 'fk', 'sk', 'sc', 'cf', 'ac', 'as', 'afc', 'bc', 'wba', 'club', 'clube', 'sport', 'spor', 'kulubu', 'calcio', 'olympique', 'de']);
-    return normStr.split(' ').filter(t => t.length > 1 && !stop.has(t)).join(' ').trim();
-}
-
-function matchTeamInCell(cellNorm, qNorm, qCore, strictOnly) {
-    if (!cellNorm || !qNorm) return false;
-    if (cellNorm === qNorm || cellNorm.includes(qNorm)) return true;
-    if (qNorm.includes(cellNorm) && cellNorm.length >= 4) return true;
-    if (strictOnly) return false;
-    let cellCore = stripGenericWords(cellNorm);
-    if (qCore && cellCore) {
-        if (cellCore === qCore || cellCore.includes(qCore)) return true;
-        if (qCore.includes(cellCore) && cellCore.length >= 4) return true;
+CUSTOM_CSS = """
+<style>
+    .stApp {
+        background-color: #05080f;
+        color: #f3f4f6;
     }
-    return false;
-}
-
-function parseScore(val) {
-    if (val === undefined || val === null) return null;
-    let s = val.toString().trim();
-    if (!s) return null;
-    let m = s.match(/^(\d{1,2})\s*[-:–—]\s*(\d{1,2})$/);
-    if (!m) return null;
-    let h = parseInt(m[1], 10), a = parseInt(m[2], 10);
-    if (isNaN(h) || isNaN(a) || h > 15 || a > 15) return null;
-    return { h, a };
-}
-
-function getRowMsScore(r) {
-    if (colMap.msScore && r[colMap.msScore] !== undefined) {
-        let sc = parseScore(r[colMap.msScore]);
-        if (sc) return sc;
+    .z-header {
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        border: 1px solid #ffd700;
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+        margin-bottom: 14px;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
     }
-    if (colMap.homeGoal && colMap.awayGoal) {
-        let h = parseInt(r[colMap.homeGoal], 10);
-        let a = parseInt(r[colMap.awayGoal], 10);
-        if (!isNaN(h) && !isNaN(a)) return { h, a };
+    .z-header h1 {
+        color: #ffd700;
+        font-size: 20px;
+        letter-spacing: 1.5px;
+        margin: 0 0 4px 0;
     }
-    return null;
-}
-
-function getRowHtScore(r) {
-    if (colMap.htScore && r[colMap.htScore] !== undefined) {
-        return parseScore(r[colMap.htScore]);
+    .z-header p {
+        color: #00f3ff;
+        font-size: 11px;
+        text-transform: uppercase;
+        font-weight: bold;
+        margin: 0;
     }
-    return null;
-}
-
-function detectColumns(headers, sampleRows) {
-    let normHeaders = headers.map(h => ({ raw: h, norm: normText(h) }));
-
-    let homeCol = (normHeaders.find(x => x.norm === 'ev sahibi' || x.norm.includes('ev sahibi')) ||
-                   normHeaders.find(x => x.norm === 'ev' || x.norm === 'home' || x.norm.includes('home team')) || {}).raw || '';
-
-    let awayCol = (normHeaders.find(x => x.norm === 'deplasman' || x.norm.includes('deplasman')) ||
-                   normHeaders.find(x => x.norm === 'dep' || x.norm === 'away' || x.norm.includes('away team')) || {}).raw || '';
-
-    let scoreCandidates = [];
-    headers.forEach(h => {
-        if (!h || h === homeCol || h === awayCol) return;
-        let hn = normText(h);
-        if (hn.includes('iy ms') || hn === 'iyms' || hn.includes('tarih') || hn.includes('saat')) return;
-        let hits = 0, goalSum = 0;
-        for (let i = 0; i < Math.min(60, sampleRows.length); i++) {
-            let sc = parseScore(sampleRows[i][h]);
-            if (sc) {
-                hits++;
-                goalSum += (sc.h + sc.a);
-            }
-        }
-        if (hits >= 5) {
-            scoreCandidates.push({ raw: h, norm: hn, hits, avgGoals: goalSum / hits });
-        }
-    });
-
-    let htScoreCol = (
-        scoreCandidates.find(x => x.norm === 'skor iy' || x.norm === 'iy skor' || x.norm === 'ilk yari skor' || x.norm === 'ht score') ||
-        scoreCandidates.find(x => (x.norm.includes('iy') || x.norm.includes('ht') || x.norm.includes('ilk yari')) && !x.norm.includes('ms') && !x.norm.includes('ft')) ||
-        normHeaders.find(x => x.norm === 'skor iy' || x.norm === 'iy skor') ||
-        {}
-    ).raw || '';
-
-    let msScoreCol = (
-        scoreCandidates.find(x => x.raw !== htScoreCol && (x.norm === 'skor ms' || x.norm === 'ms skor' || x.norm === 'mac sonu skor' || x.norm === 'ft score')) ||
-        scoreCandidates.find(x => x.raw !== htScoreCol && (x.norm.includes('ms') || x.norm.includes('ft')) && !x.norm.includes('iy') && !x.norm.includes('ht')) ||
-        scoreCandidates.find(x => x.raw !== htScoreCol && x.norm.includes('skor') && !x.norm.includes('iy') && !x.norm.includes('ht')) ||
-        scoreCandidates.filter(x => x.raw !== htScoreCol && !x.norm.includes('iy') && !x.norm.includes('ht')).sort((a, b) => b.avgGoals - a.avgGoals)[0] ||
-        normHeaders.find(x => x.norm === 'skor ms' || x.norm === 'ms skor') ||
-        {}
-    ).raw || '';
-
-    let homeGoalCol = (normHeaders.find(x => x.norm === 'ev gol' || x.norm === 'ms ev' || x.norm === 'ev skor') || {}).raw || '';
-    let awayGoalCol = (normHeaders.find(x => x.norm === 'dep gol' || x.norm === 'ms dep' || x.norm === 'dep skor') || {}).raw || '';
-
-    colMap = { home: homeCol, away: awayCol, msScore: msScoreCol, htScore: htScoreCol, homeGoal: homeGoalCol, awayGoal: awayGoalCol };
-}
-
-document.getElementById('excelFile').addEventListener('change', function(e) {
-    let file = e.target.files[0];
-    if (!file) return;
-    
-    let reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            let data = new Uint8Array(e.target.result);
-            let workbook = XLSX.read(data, {type: 'array'});
-            let worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            let rawJson = XLSX.utils.sheet_to_json(worksheet, {header: 1, raw: false});
-            
-            let headerIdx = -1;
-            for (let r = 0; r < Math.min(16, rawJson.length); r++) {
-                let row = rawJson[r] || [];
-                let joined = row.map(c => normText(c)).join('|');
-                if (joined.includes('ev sahibi') || (joined.includes('ev') && joined.includes('deplasman')) || (joined.includes('home') && joined.includes('away'))) {
-                    headerIdx = r;
-                    break;
-                }
-            }
-            if (headerIdx === -1 && rawJson.length > 7) headerIdx = 7;
-
-            if (headerIdx !== -1 && rawJson.length > headerIdx + 1) {
-                let headers = rawJson[headerIdx].map((h, i) => (h !== undefined && h !== null && h.toString().trim() !== '') ? h.toString().trim() : `COL_${i}`);
-                let rows = rawJson.slice(headerIdx + 1);
-                let parsed = rows.map(row => {
-                    let obj = {};
-                    headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ""; });
-                    return obj;
-                });
-
-                detectColumns(headers, parsed);
-
-                excelData = parsed.filter(r => (colMap.home && r[colMap.home]) || (colMap.away && r[colMap.away]));
-                document.getElementById('fileStatus').style.color = 'var(--accent-green)';
-                document.getElementById('fileStatus').innerHTML = `✔ Başarılı! <b>${excelData.length}</b> satırlık arşiv yüklendi.<br><span style="font-size:10px; color:var(--text-muted);">Algılanan Sütunlar ➔ Ev: [${colMap.home || 'YOK'}] | Dep: [${colMap.away || 'YOK'}] | MS: [${colMap.msScore || (colMap.homeGoal ? colMap.homeGoal+'/'+colMap.awayGoal : 'YOK')}] | İY: [${colMap.htScore || 'YOK'}]</span>`;
-            } else {
-                alert("Excel formatı uygun değil! Başlık satırı bulunamadı.");
-            }
-        } catch (err) { alert("Excel okuma hatası: " + err.message); }
-    };
-    reader.readAsArrayBuffer(file);
-});
-
-async function callGeminiModel(apiKey, modelName, prompt, useSearch) {
-    let bodyObj = { contents: [{ parts: [{ text: prompt }] }] };
-    if (useSearch) bodyObj.tools = [{ google_search: {} }];
-    return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyObj)
-    });
-}
-
-async function findActiveModel(apiKey, skipList) {
-    let resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
-    if (!resp.ok) return null;
-    let data = await resp.json();
-    let models = data.models || [];
-    let valid = models
-        .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-        .map(m => m.name.replace('models/', ''))
-        .filter(name => !skipList.includes(name));
-    return valid.find(n => n.includes('3.8-flash')) || valid.find(n => n.includes('flash')) || valid[0] || null;
-}
-
-async function fetchInjuriesViaAPI() {
-    let apiKey = document.getElementById('geminiApiKey').value.trim();
-    let matchName = document.getElementById('matchInput').value.trim();
-    let statusEl = document.getElementById('apiStatus');
-
-    if (!apiKey) { statusEl.style.color = 'var(--accent-red)'; statusEl.innerText = '⚠️ Önce API anahtarını gir.'; return; }
-    if (!matchName || !matchName.includes('-')) { statusEl.style.color = 'var(--accent-orange)'; statusEl.innerText = '⚠️ 2. kutuya "Ev Sahibi - Deplasman" yaz.'; return; }
-
-    try { localStorage.setItem('zaferopta_gemini_key', apiKey); } catch (e) {}
-    statusEl.style.color = 'var(--accent-gold)';
-    statusEl.innerText = '⏳ İlk 11 sakat/cezalılar ve yerine girenler taranıyor...';
-
-    let prompt = `${matchName} futbol maçı için her iki takımın bugünkü güncel sakat ve cezalı İLK 11 oyuncularını internetten araştır. Uzun süreli veya yedek oyuncuları yazma. Stoper, bek, kaleci ve kilit oyun kurucu mevkilerini ayrı ve net belirt. Eğer yerine ilk 11'de geçecek yedek oyuncunun güncel SofaScore/WhoScored sezon puanını gerçek kaynakta bulabiliyorsan ve 6.50 altındaysa oyuncunun yanına puanı ekle (örn: Lacroix stoper 6.3); gerçek puan bulamazsan kesinlikle tahmin etme ve sayı yazma. Sadece şu 2 satır formatında kısa cevap ver:\nEV: [eksik oyuncular ve mevkileri, yoksa Yok]\nDEP: [eksik oyuncular ve mevkileri, yoksa Yok]`;
-
-    try {
-        let candidates = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.0-flash'];
-        let tried = [], resp = null, usedModel = '';
-
-        for (let m of candidates) {
-            tried.push(m);
-            resp = await callGeminiModel(apiKey, m, prompt, true);
-            if (resp.status === 400) resp = await callGeminiModel(apiKey, m, prompt, false);
-            if (resp.ok) { usedModel = m; break; }
-            if (resp.status !== 404) break;
-        }
-        if (!resp || resp.status === 404) {
-            let detected = await findActiveModel(apiKey, tried);
-            if (detected) {
-                usedModel = detected;
-                resp = await callGeminiModel(apiKey, detected, prompt, true);
-                if (resp.status === 400) resp = await callGeminiModel(apiKey, detected, prompt, false);
-            }
-        }
-        if (!resp || !resp.ok) {
-            if (resp && resp.status === 429) throw new Error("Kota doldu (HTTP 429).");
-            throw new Error(resp ? `HTTP ${resp.status}` : 'Bağlantı hatası');
-        }
-
-        let data = await resp.json();
-        let text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n') || '';
-        let evMatch = text.match(/EV:\s*(.+)/i);
-        let depMatch = text.match(/DEP:\s*(.+)/i);
-        let evText = evMatch ? evMatch[1].replace(/\*/g, '').trim() : "Bilgi bulunamadı";
-        let depText = depMatch ? depMatch[1].replace(/\*/g, '').trim() : "Bilgi bulunamadı";
-
-        document.getElementById('homeInjuries').value = evText.toLowerCase() === 'yok' ? '' : evText;
-        document.getElementById('awayInjuries').value = depText.toLowerCase() === 'yok' ? '' : depText;
-        statusEl.style.color = 'var(--accent-green)';
-        statusEl.innerText = `✔ Tarama tamamlandı (${usedModel}) ve 3-4. kutulara işlendi!`;
-    } catch (err) {
-        statusEl.style.color = 'var(--accent-red)';
-        statusEl.innerText = '❌ Hata: ' + err.message;
+    .engine-card {
+        background-color: #0b1120;
+        border-left: 4px solid #00f3ff;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        line-height: 1.6;
     }
+    .engine-card h4 {
+        margin: 0 0 8px 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .score-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .score-item {
+        background: #131b2e;
+        border: 1px solid #1e293b;
+        padding: 7px;
+        text-align: center;
+        border-radius: 6px;
+    }
+    .score-item .sc {
+        font-weight: bold;
+        color: #00f3ff;
+        font-size: 14px;
+    }
+    .score-item .pr {
+        font-size: 11px;
+        color: #9ca3af;
+    }
+    .consensus-box {
+        background: linear-gradient(135deg, #064e3b, #022c22);
+        border: 2px solid #ffd700;
+        padding: 16px;
+        border-radius: 10px;
+        margin-top: 14px;
+        box-shadow: 0 0 25px rgba(255, 215, 0, 0.25);
+        color: #ffffff;
+        font-size: 13px;
+        line-height: 1.85;
+    }
+    .consensus-title {
+        color: #ffd700;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .seal-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+        margin-left: 4px;
+    }
+    .seal-triple { background: #ffd700; color: #000000; }
+    .seal-ok { background: #00ff66; color: #000000; }
+    .seal-diff { background: #ff9900; color: #000000; }
+    .seal-pass { background: #ff3366; color: #ffffff; }
+    .alert-def {
+        margin-top: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        background: rgba(0, 243, 255, 0.12);
+        border: 1px solid #00f3ff;
+        color: #e0f2fe;
+        font-size: 12px;
+    }
+    .alert-backbone {
+        margin-top: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        background: rgba(168, 85, 247, 0.16);
+        border: 1px solid #a855f7;
+        color: #f3e8ff;
+        font-size: 12px;
+    }
+    .alert-caution {
+        margin-top: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        background: rgba(255, 153, 0, 0.16);
+        border: 1px solid #ff9900;
+        color: #fef3c7;
+        font-size: 12px;
+    }
+    .alert-radar {
+        margin-top: 8px;
+        padding: 9px;
+        border-radius: 6px;
+        background: rgba(255, 215, 0, 0.15);
+        border: 1px solid #ffd700;
+        color: #fef08a;
+        font-size: 12px;
+    }
+    .seal-footer {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 215, 0, 0.35);
+        text-align: center;
+        font-size: 13px;
+        color: #ffd700;
+        font-weight: bold;
+    }
+</style>
+"""
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+STOP_WORDS = {
+    "fc", "fk", "sk", "sc", "cf", "ac", "as", "afc", "bc", "wba",
+    "club", "clube", "sport", "spor", "kulubu", "calcio", "olympique", "de"
 }
 
-function factorial(n) {
-    if (n === 0 || n === 1) return 1;
-    let res = 1;
-    for (let i = 2; i <= n; i++) res *= i;
-    return res;
-}
 
-function poissonProb(lambda, k) {
-    return (Math.exp(-lambda) * Math.pow(lambda, k)) / factorial(k);
-}
+def norm_text(val) -> str:
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return ""
+    s = str(val)
+    tr_map = {
+        "İ": "i", "I": "i", "ı": "i",
+        "Ş": "s", "ş": "s",
+        "Ğ": "g", "ğ": "g",
+        "Ü": "u", "ü": "u",
+        "Ö": "o", "ö": "o",
+        "Ç": "c", "ç": "c",
+    }
+    for k, v in tr_map.items():
+        s = s.replace(k, v)
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
 
-function dixonColesTau(h, a, lam, mu, rho) {
-    if (h === 0 && a === 0) return Math.max(0.25, 1 - lam * mu * rho);
-    if (h === 0 && a === 1) return Math.max(0.25, 1 + lam * rho);
-    if (h === 1 && a === 0) return Math.max(0.25, 1 + mu * rho);
-    if (h === 1 && a === 1) return Math.max(0.25, 1 - rho);
-    return 1.0;
-}
 
-function poissonOverTotalProb(totalLambda, line) {
-    let maxUnder = Math.floor(line);
-    let underSum = 0;
-    for (let k = 0; k <= maxUnder; k++) underSum += poissonProb(totalLambda, k);
-    return Math.max(0.01, Math.min(0.99, 1 - underSum));
-}
+def strip_generic_words(norm_str: str) -> str:
+    tokens = [t for t in norm_str.split(" ") if len(t) > 1 and t not in STOP_WORDS]
+    return " ".join(tokens).strip()
 
-function parseNum(id) {
-    let raw = document.getElementById(id).value;
-    if (!raw) return NaN;
-    return parseFloat(raw.toString().replace(',', '.'));
-}
 
-// V36.1: SAVUNMA, KALECİ VE KİLİT OYUN KURUCU AYRIMI
-function analyzeInjuryText(text) {
-    if (!text || text.trim().length < 2 || text.trim().toLowerCase() === 'yok') {
+def match_team_in_cell(cell_norm: str, q_norm: str, q_core: str, strict_only: bool) -> bool:
+    if not cell_norm or not q_norm:
+        return False
+    if cell_norm == q_norm or q_norm in cell_norm:
+        return True
+    if cell_norm in q_norm and len(cell_norm) >= 4:
+        return True
+    if strict_only:
+        return False
+    cell_core = strip_generic_words(cell_norm)
+    if q_core and cell_core:
+        if cell_core == q_core or q_core in cell_core:
+            return True
+        if cell_core in q_core and len(cell_core) >= 4:
+            return True
+    return False
+
+
+def parse_score(val):
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    m = re.match(r"^(\d{1,2})\s*[-:–—]\s*(\d{1,2})$", s)
+    if not m:
+        return None
+    h, a = int(m.group(1)), int(m.group(2))
+    if h > 15 or a > 15:
+        return None
+    return (h, a)
+
+
+def detect_columns(df: pd.DataFrame) -> dict:
+    headers = list(df.columns)
+    norm_headers = [(h, norm_text(h)) for h in headers]
+
+    home_col = next(
+        (h for h, n in norm_headers if n == "ev sahibi" or "ev sahibi" in n),
+        next((h for h, n in norm_headers if n in {"ev", "home"} or "home team" in n), ""),
+    )
+    away_col = next(
+        (h for h, n in norm_headers if n == "deplasman" or "deplasman" in n),
+        next((h for h, n in norm_headers if n in {"dep", "away"} or "away team" in n), ""),
+    )
+
+    score_candidates = []
+    sample_df = df.head(60)
+    for h, hn in norm_headers:
+        if not h or h in {home_col, away_col}:
+            continue
+        if "iy ms" in hn or hn == "iyms" or "tarih" in hn or "saat" in hn:
+            continue
+        hits = 0
+        goal_sum = 0
+        for val in sample_df[h]:
+            sc = parse_score(val)
+            if sc is not None:
+                hits += 1
+                goal_sum += sc[0] + sc[1]
+        if hits >= 5:
+            score_candidates.append((h, hn, hits, goal_sum / hits))
+
+    ht_col = next(
+        (h for h, hn, _, _ in score_candidates if hn in {"skor iy", "iy skor", "ilk yari skor", "ht score"}),
+        next(
+            (
+                h for h, hn, _, _ in score_candidates
+                if ("iy" in hn or "ht" in hn or "ilk yari" in hn) and "ms" not in hn and "ft" not in hn
+            ),
+            next((h for h, n in norm_headers if n in {"skor iy", "iy skor"}), ""),
+        ),
+    )
+
+    ms_col = next(
+        (
+            h for h, hn, _, _ in score_candidates
+            if h != ht_col and hn in {"skor ms", "ms skor", "mac sonu skor", "ft score"}
+        ),
+        next(
+            (
+                h for h, hn, _, _ in score_candidates
+                if h != ht_col and ("ms" in hn or "ft" in hn) and "iy" not in hn and "ht" not in hn
+            ),
+            next(
+                (
+                    h for h, hn, _, _ in score_candidates
+                    if h != ht_col and "skor" in hn and "iy" not in hn and "ht" not in hn
+                ),
+                "",
+            ),
+        ),
+    )
+    if not ms_col:
+        rem = [x for x in score_candidates if x[0] != ht_col and "iy" not in x[1] and "ht" not in x[1]]
+        if rem:
+            rem.sort(key=lambda x: x[3], reverse=True)
+            ms_col = rem[0][0]
+        else:
+            ms_col = next((h for h, n in norm_headers if n in {"skor ms", "ms skor"}), "")
+
+    home_goal_col = next((h for h, n in norm_headers if n in {"ev gol", "ms ev", "ev skor"}), "")
+    away_goal_col = next((h for h, n in norm_headers if n in {"dep gol", "ms dep", "dep skor"}), "")
+
+    return {
+        "home": home_col,
+        "away": away_col,
+        "ms_score": ms_col,
+        "ht_score": ht_col,
+        "home_goal": home_goal_col,
+        "away_goal": away_goal_col,
+    }
+
+
+@st.cache_data(show_spinner=False)
+def load_excel_archive(file_bytes: bytes):
+    raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=0, header=None, dtype=str)
+    header_idx = -1
+    for r in range(min(16, len(raw_df))):
+        row_vals = [norm_text(c) for c in raw_df.iloc[r].tolist()]
+        joined = "|".join(row_vals)
+        if (
+            "ev sahibi" in joined
+            or ("ev" in row_vals and "deplasman" in row_vals)
+            or ("home" in row_vals and "away" in row_vals)
+        ):
+            header_idx = r
+            break
+    if header_idx == -1 and len(raw_df) > 7:
+        header_idx = 7
+
+    if header_idx == -1 or len(raw_df) <= header_idx + 1:
+        return None, None
+
+    raw_headers = raw_df.iloc[header_idx].tolist()
+    headers = []
+    seen_cols = {}
+    for i, h in enumerate(raw_headers):
+        base = str(h).strip() if (h is not None and str(h).strip() != "" and str(h).lower() != "nan") else f"COL_{i}"
+        if base in seen_cols:
+            seen_cols[base] += 1
+            base = f"{base}_{seen_cols[base]}"
+        else:
+            seen_cols[base] = 0
+        headers.append(base)
+
+    df = raw_df.iloc[header_idx + 1:].copy().reset_index(drop=True)
+    df.columns = headers
+    col_map = detect_columns(df)
+
+    if col_map["home"] or col_map["away"]:
+        mask = pd.Series(False, index=df.index)
+        if col_map["home"]:
+            mask = mask | (df[col_map["home"]].notna() & (df[col_map["home"]].astype(str).str.strip() != ""))
+        if col_map["away"]:
+            mask = mask | (df[col_map["away"]].notna() & (df[col_map["away"]].astype(str).str.strip() != ""))
+        df = df[mask].reset_index(drop=True)
+
+    return df, col_map
+
+
+def get_row_ms_score(row: pd.Series, col_map: dict):
+    if col_map["ms_score"]:
+        sc = parse_score(row.get(col_map["ms_score"]))
+        if sc is not None:
+            return sc
+    if col_map["home_goal"] and col_map["away_goal"]:
+        try:
+            h = int(float(str(row.get(col_map["home_goal"])).strip()))
+            a = int(float(str(row.get(col_map["away_goal"])).strip()))
+            return (h, a)
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def get_row_ht_score(row: pd.Series, col_map: dict):
+    if col_map["ht_score"]:
+        return parse_score(row.get(col_map["ht_score"]))
+    return None
+
+
+def find_team_rows(df: pd.DataFrame, col_map: dict, team_name: str):
+    q_norm = norm_text(team_name)
+    q_core = strip_generic_words(q_norm)
+    if df is None or df.empty or not q_norm:
+        return [], "", True, q_norm, q_core
+
+    home_col = col_map["home"]
+    away_col = col_map["away"]
+
+    matched_indices = []
+    strict_mode = True
+    for idx, row in df.iterrows():
+        ev = norm_text(row.get(home_col, ""))
+        dep = norm_text(row.get(away_col, ""))
+        if match_team_in_cell(ev, q_norm, q_core, True) or match_team_in_cell(dep, q_norm, q_core, True):
+            matched_indices.append(idx)
+
+    if not matched_indices:
+        strict_mode = False
+        for idx, row in df.iterrows():
+            ev = norm_text(row.get(home_col, ""))
+            dep = norm_text(row.get(away_col, ""))
+            if match_team_in_cell(ev, q_norm, q_core, False) or match_team_in_cell(dep, q_norm, q_core, False):
+                matched_indices.append(idx)
+
+    matched_label = ""
+    if matched_indices:
+        r0 = df.loc[matched_indices[0]]
+        ev0 = norm_text(r0.get(home_col, ""))
+        matched_label = r0.get(home_col, "") if match_team_in_cell(ev0, q_norm, q_core, strict_mode) else r0.get(away_col, "")
+
+    return matched_indices, str(matched_label).strip(), strict_mode, q_norm, q_core
+
+
+def calc_team_stats(df: pd.DataFrame, col_map: dict, indices: list, strict_mode: bool, q_norm: str, q_core: str):
+    if not indices:
+        return None
+
+    played = scored = conceded = wins = draws = losses = 0
+    home_played = home_wins = home_scored = home_conceded = 0
+    away_played = away_wins = away_scored = away_conceded = 0
+    ewma_points = 0.0
+    ewma_weight_sum = 0.0
+    total_recent = len(indices)
+
+    for pos, idx in enumerate(indices):
+        row = df.loc[idx]
+        ev = norm_text(row.get(col_map["home"], ""))
+        dep = norm_text(row.get(col_map["away"], ""))
+        sc = get_row_ms_score(row, col_map)
+        if sc is None:
+            continue
+
+        is_home = match_team_in_cell(ev, q_norm, q_core, strict_mode)
+        is_away = (not is_home) and match_team_in_cell(dep, q_norm, q_core, strict_mode)
+        if not is_home and not is_away:
+            continue
+
+        gf = sc[0] if is_home else sc[1]
+        ga = sc[1] if is_home else sc[0]
+        played += 1
+        scored += gf
+        conceded += ga
+
+        if gf > ga:
+            wins += 1
+            pts = 3
+            if is_home:
+                home_wins += 1
+            else:
+                away_wins += 1
+        elif gf == ga:
+            draws += 1
+            pts = 1
+        else:
+            losses += 1
+            pts = 0
+
+        if is_home:
+            home_played += 1
+            home_scored += gf
+            home_conceded += ga
+        else:
+            away_played += 1
+            away_scored += gf
+            away_conceded += ga
+
+        w = 0.85 ** max(0, total_recent - 1 - pos)
+        ewma_points += (pts / 3.0) * w
+        ewma_weight_sum += w
+
+    if played == 0:
+        return None
+
+    return {
+        "played": played,
+        "avg_scored": scored / played,
+        "avg_conceded": conceded / played,
+        "home_played": home_played,
+        "home_avg_scored": (home_scored / home_played) if home_played >= 3 else (scored / played),
+        "home_avg_conceded": (home_conceded / home_played) if home_played >= 3 else (conceded / played),
+        "away_played": away_played,
+        "away_avg_scored": (away_scored / away_played) if away_played >= 3 else (scored / played),
+        "away_avg_conceded": (away_conceded / away_played) if away_played >= 3 else (conceded / played),
+        "win_rate": round((wins / played) * 100),
+        "home_win_rate": round((home_wins / home_played) * 100) if home_played > 0 else round((wins / played) * 100),
+        "away_win_rate": round((away_wins / away_played) * 100) if away_played > 0 else round((wins / played) * 100),
+        "ewma_form": round((ewma_points / ewma_weight_sum) * 100) if ewma_weight_sum > 0 else 50,
+    }
+
+
+def poisson_prob(lam: float, k: int) -> float:
+    return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
+
+
+def dixon_coles_tau(h: int, a: int, lam: float, mu: float, rho: float) -> float:
+    if h == 0 and a == 0:
+        return max(0.25, 1.0 - lam * mu * rho)
+    if h == 0 and a == 1:
+        return max(0.25, 1.0 + lam * rho)
+    if h == 1 and a == 0:
+        return max(0.25, 1.0 + mu * rho)
+    if h == 1 and a == 1:
+        return max(0.25, 1.0 - rho)
+    return 1.0
+
+
+def poisson_over_total_prob(total_lambda: float, line: float) -> float:
+    max_under = int(math.floor(line))
+    under_sum = sum(poisson_prob(total_lambda, k) for k in range(max_under + 1))
+    return max(0.01, min(0.99, 1.0 - under_sum))
+
+
+def analyze_injury_text(text: str) -> dict:
+    if not text or len(text.strip()) < 2 or text.strip().lower() == "yok":
         return {
-            attPen: 0, defPen: 0, gkPen: 0, count: 0, starterCount: 0, keyCount: 0,
-            defStarterCount: 0, gkStarterCount: 0, attMidStarterCount: 0, benchCount: 0,
-            defCollapse: false, weakSubs: [],
-            note: "Tam kadro (etkili eksik yok)"
-        };
-    }
-    let items = text.split(/,|;| ve |\/|\+/).map(x => x.trim()).filter(x => x.length > 1);
-    let attPen = 0, defPen = 0, gkPen = 0, starterCount = 0, keyCount = 0, benchCount = 0;
-    let defStarterCount = 0, gkStarterCount = 0, attMidStarterCount = 0;
-    let weakSubs = [];
-
-    items.forEach(item => {
-        let t = normText(item);
-        if (/\byedek\b/.test(t) || /\buzun\b/.test(t) || /\brotasyon\b/.test(t) || /\bgenc\b/.test(t) || /\bbench\b/.test(t) || /\bsub\b/.test(t)) {
-            benchCount++;
-            return;
+            "att_pen": 0.0,
+            "def_pen": 0.0,
+            "gk_pen": 0.0,
+            "count": 0,
+            "starter_count": 0,
+            "key_count": 0,
+            "def_starter_count": 0,
+            "gk_starter_count": 0,
+            "att_mid_starter_count": 0,
+            "bench_count": 0,
+            "def_collapse": False,
+            "weak_subs": [],
+            "note": "Tam kadro (etkili eksik yok)",
         }
 
-        let ratingMatch = item.match(/\b([4-9][.,]\d{1,2})\b/);
-        let subMult = 1.0;
-        if (ratingMatch) {
-            let rVal = parseFloat(ratingMatch[1].replace(',', '.'));
-            if (rVal < 6.20) { subMult = 1.35; weakSubs.push(`${item.split(' ')[0]} (${rVal.toFixed(1)})`); }
-            else if (rVal < 6.50) { subMult = 1.20; weakSubs.push(`${item.split(' ')[0]} (${rVal.toFixed(1)})`); }
-            else if (rVal >= 6.80) { subMult = 0.80; }
-        }
+    items = [x.strip() for x in re.split(r",|;| ve |\/|\+", text) if len(x.strip()) > 1]
+    att_pen = def_pen = gk_pen = 0.0
+    starter_count = key_count = bench_count = 0
+    def_starter_count = gk_starter_count = att_mid_starter_count = 0
+    weak_subs = []
 
-        let isKey = /\bkilit\b/.test(t) || /\byildiz\b/.test(t) || /\bkaptan\b/.test(t) || /\bas\b/.test(t) || /\bstar\b/.test(t) || /\bkey\b/.test(t) || t.includes('golcu') || t.includes('oyun kurucu') || t.includes('10 numara');
-        let mult = (isKey ? 1.35 : 1.0) * subMult;
-        starterCount++;
-        if (isKey) keyCount++;
+    for item in items:
+        t = norm_text(item)
+        if re.search(r"\b(yedek|uzun|rotasyon|genc|bench|sub)\b", t):
+            bench_count += 1
+            continue
 
-        let isGk = t.includes('kaleci') || /\bgk\b/.test(t);
-        let isDef = !isGk && (t.includes('stoper') || t.includes('defans') || t.includes('bek') || t.includes('savunma'));
-        let isAtt = !isGk && (t.includes('forvet') || t.includes('santrafor') || t.includes('golcu') || t.includes('kanat') || t.includes('hucum'));
-        let isPlaymaker = !isGk && !isDef && (t.includes('oyun kurucu') || t.includes('10 numara') || (t.includes('orta saha') && isKey));
-        let isMid = !isGk && !isDef && !isAtt && !isPlaymaker && (t.includes('orta saha') || t.includes('libero') || t.includes('merkez'));
+        rating_match = re.search(r"\b([4-9][.,]\d{1,2})\b", item)
+        sub_mult = 1.0
+        if rating_match:
+            r_val = float(rating_match.group(1).replace(",", "."))
+            if r_val < 6.20:
+                sub_mult = 1.35
+                weak_subs.append(f"{item.split(' ')[0]} ({r_val:.1f})")
+            elif r_val < 6.50:
+                sub_mult = 1.20
+                weak_subs.append(f"{item.split(' ')[0]} ({r_val:.1f})")
+            elif r_val >= 6.80:
+                sub_mult = 0.80
 
-        let bAtt = 0, bDef = 0, bGk = 0;
-        if (isGk) {
-            gkStarterCount++;
-            bGk += 0.05;
-        } else if (isDef) {
-            defStarterCount++;
-            bDef += 0.11;
-            bAtt += 0.01;
-        } else if (isPlaymaker) {
-            attMidStarterCount++;
-            bAtt += 0.065; // Kilit oyun kurucu / 10 numara yüksek hücum etkisi
-            bDef += 0.035;
-        } else if (isAtt) {
-            attMidStarterCount++;
-            bAtt += 0.05;
-            bDef += 0.005;
-        } else if (isMid) {
-            attMidStarterCount++;
-            bAtt += 0.03;
-            bDef += 0.035;
-        } else {
-            attMidStarterCount++;
-            bAtt += 0.03;
-            bDef += 0.03;
-        }
+        is_key = bool(
+            re.search(r"\b(kilit|yildiz|kaptan|as|star|key)\b", t)
+            or "golcu" in t
+            or "oyun kurucu" in t
+            or "10 numara" in t
+        )
+        mult = (1.35 if is_key else 1.0) * sub_mult
+        starter_count += 1
+        if is_key:
+            key_count += 1
 
-        attPen += bAtt * mult;
-        defPen += bDef * mult;
-        gkPen += bGk * mult;
-    });
+        is_gk = "kaleci" in t or bool(re.search(r"\bgk\b", t))
+        is_def = (not is_gk) and any(k in t for k in ("stoper", "defans", "bek", "savunma"))
+        is_att = (not is_gk) and any(k in t for k in ("forvet", "santrafor", "golcu", "kanat", "hucum"))
+        is_playmaker = (not is_gk) and (not is_def) and (
+            "oyun kurucu" in t or "10 numara" in t or ("orta saha" in t and is_key)
+        )
+        is_mid = (not is_gk) and (not is_def) and (not is_att) and (not is_playmaker) and any(
+            k in t for k in ("orta saha", "libero", "merkez")
+        )
 
-    let defCollapse = defStarterCount >= 2;
-    if (defCollapse) {
-        defPen += 0.12 + Math.max(0, defStarterCount - 2) * 0.06;
-    }
+        b_att = b_def = b_gk = 0.0
+        if is_gk:
+            gk_starter_count += 1
+            b_gk += 0.05
+        elif is_def:
+            def_starter_count += 1
+            b_def += 0.11
+            b_att += 0.01
+        elif is_playmaker:
+            att_mid_starter_count += 1
+            b_att += 0.065
+            b_def += 0.035
+        elif is_att:
+            att_mid_starter_count += 1
+            b_att += 0.05
+            b_def += 0.005
+        elif is_mid:
+            att_mid_starter_count += 1
+            b_att += 0.03
+            b_def += 0.035
+        else:
+            att_mid_starter_count += 1
+            b_att += 0.03
+            b_def += 0.03
 
-    attPen = Math.min(0.28, attPen);
-    defPen = Math.min(0.55, defPen);
-    gkPen = Math.min(0.12, gkPen);
+        att_pen += b_att * mult
+        def_pen += b_def * mult
+        gk_pen += b_gk * mult
 
-    let tierSummary = `${starterCount} ilk 11`;
-    let roleParts = [];
-    if (defStarterCount > 0) roleParts.push(`${defStarterCount} savunma`);
-    if (gkStarterCount > 0) roleParts.push(`${gkStarterCount} kaleci`);
-    if (roleParts.length > 0) tierSummary += ` (${roleParts.join(', ')})`;
-    if (benchCount > 0) tierSummary += `, ${benchCount} yedek/uzun (%0)`;
+    def_collapse = def_starter_count >= 2
+    if def_collapse:
+        def_pen += 0.12 + max(0, def_starter_count - 2) * 0.06
 
-    let tags = '';
-    if (defCollapse) tags += ` <span style="color:var(--accent-red); font-weight:bold;">[🚨 SAVUNMA ÇÖKÜŞÜ]</span>`;
-    if (weakSubs.length > 0) tags += ` <span style="color:var(--accent-yellow); font-weight:bold;">[⚠️ Zayıf İkame: ${weakSubs.join(', ')}]</span>`;
+    att_pen = min(0.28, att_pen)
+    def_pen = min(0.55, def_pen)
+    gk_pen = min(0.12, gk_pen)
 
-    let gkNoteStr = gkPen > 0 ? `, Kaleci -%${Math.round(gkPen*100)}` : '';
+    tier_summary = f"{starter_count} ilk 11"
+    role_parts = []
+    if def_starter_count > 0:
+        role_parts.append(f"{def_starter_count} savunma")
+    if gk_starter_count > 0:
+        role_parts.append(f"{gk_starter_count} kaleci")
+    if role_parts:
+        tier_summary += f" ({', '.join(role_parts)})"
+    if bench_count > 0:
+        tier_summary += f", {bench_count} yedek/uzun (%0)"
+
+    tags = ""
+    if def_collapse:
+        tags += " [🚨 SAVUNMA ÇÖKÜŞÜ]"
+    if weak_subs:
+        tags += f" [⚠️ Zayıf İkame: {', '.join(weak_subs)}]"
+
+    gk_note = f", Kaleci -%{round(gk_pen * 100)}" if gk_pen > 0 else ""
+    note = (
+        f"{tier_summary} ➔ Savunma Zafiyeti -%{round(def_pen * 100)}"
+        f"{gk_note}, Hücum/OS -%{round(att_pen * 100)}{tags}"
+    )
 
     return {
-        attPen, defPen, gkPen, count: items.length, starterCount, keyCount,
-        defStarterCount, gkStarterCount, attMidStarterCount, benchCount,
-        defCollapse, weakSubs,
-        note: `${tierSummary} ➔ Savunma Zafiyeti -%${Math.round(defPen*100)}${gkNoteStr}, Hücum/OS -%${Math.round(attPen*100)}${tags}`
-    };
-}
-
-function normalizeWeights(rawObj) {
-    let keys = Object.keys(rawObj);
-    let sum = keys.reduce((acc, k) => acc + Math.max(0, rawObj[k]), 0);
-    if (sum <= 0) return { w1: 35, w2: 20, w3: 15, w4: 10, w5: 20 };
-    let res = {};
-    let total = 0;
-    keys.forEach(k => {
-        res[k] = Math.round((Math.max(0, rawObj[k]) / sum) * 100);
-        total += res[k];
-    });
-    let diff = 100 - total;
-    if (diff !== 0) {
-        let maxKey = keys.reduce((a, b) => res[a] >= res[b] ? a : b);
-        res[maxKey] += diff;
-    }
-    return res;
-}
-
-function findTeamRows(data, teamName) {
-    let qNorm = normText(teamName);
-    let qCore = stripGenericWords(qNorm);
-    if (!data || !data.length || !qNorm) return { rows: [], matchedLabel: '' };
-
-    let rows = data.filter(r => {
-        let ev = normText(r[colMap.home]);
-        let dep = normText(r[colMap.away]);
-        return matchTeamInCell(ev, qNorm, qCore, true) || matchTeamInCell(dep, qNorm, qCore, true);
-    });
-    let strictMode = true;
-
-    if (rows.length === 0) {
-        strictMode = false;
-        rows = data.filter(r => {
-            let ev = normText(r[colMap.home]);
-            let dep = normText(r[colMap.away]);
-            return matchTeamInCell(ev, qNorm, qCore, false) || matchTeamInCell(dep, qNorm, qCore, false);
-        });
+        "att_pen": att_pen,
+        "def_pen": def_pen,
+        "gk_pen": gk_pen,
+        "count": len(items),
+        "starter_count": starter_count,
+        "key_count": key_count,
+        "def_starter_count": def_starter_count,
+        "gk_starter_count": gk_starter_count,
+        "att_mid_starter_count": att_mid_starter_count,
+        "bench_count": bench_count,
+        "def_collapse": def_collapse,
+        "weak_subs": weak_subs,
+        "note": note,
     }
 
-    let matchedLabel = '';
-    if (rows.length > 0) {
-        let r0 = rows[0];
-        let ev = normText(r0[colMap.home]);
-        matchedLabel = matchTeamInCell(ev, qNorm, qCore, strictMode) ? r0[colMap.home] : r0[colMap.away];
-    }
-
-    return { rows, matchedLabel, strictMode, qNorm, qCore };
-}
-
-function calcTeamStats(foundObj) {
-    let rows = foundObj.rows;
-    if (!rows || rows.length === 0) return null;
-
-    let played = 0, scored = 0, conceded = 0, wins = 0, draws = 0, losses = 0;
-    let homePlayed = 0, homeWins = 0, homeScored = 0, homeConceded = 0;
-    let awayPlayed = 0, awayWins = 0, awayScored = 0, awayConceded = 0;
-    let ewmaPoints = 0, ewmaWeightSum = 0;
-    let totalRecent = rows.length;
-
-    rows.forEach((r, idx) => {
-        let ev = normText(r[colMap.home]);
-        let dep = normText(r[colMap.away]);
-        let sc = getRowMsScore(r);
-        if (!sc) return;
-
-        let isHome = matchTeamInCell(ev, foundObj.qNorm, foundObj.qCore, foundObj.strictMode);
-        let isAway = !isHome && matchTeamInCell(dep, foundObj.qNorm, foundObj.qCore, foundObj.strictMode);
-        if (!isHome && !isAway) return;
-
-        let gf = isHome ? sc.h : sc.a;
-        let ga = isHome ? sc.a : sc.h;
-        played++;
-        scored += gf;
-        conceded += ga;
-
-        let pts = 0;
-        if (gf > ga) { wins++; pts = 3; if (isHome) homeWins++; else awayWins++; }
-        else if (gf === ga) { draws++; pts = 1; }
-        else { losses++; pts = 0; }
-
-        if (isHome) { homePlayed++; homeScored += gf; homeConceded += ga; }
-        else { awayPlayed++; awayScored += gf; awayConceded += ga; }
-
-        let w = Math.pow(0.85, Math.max(0, totalRecent - 1 - idx));
-        ewmaPoints += (pts / 3) * w;
-        ewmaWeightSum += w;
-    });
-
-    if (played === 0) return null;
-    return {
-        played,
-        avgScored: scored / played,
-        avgConceded: conceded / played,
-        homePlayed,
-        homeAvgScored: homePlayed >= 3 ? (homeScored / homePlayed) : (scored / played),
-        homeAvgConceded: homePlayed >= 3 ? (homeConceded / homePlayed) : (conceded / played),
-        awayPlayed,
-        awayAvgScored: awayPlayed >= 3 ? (awayScored / awayPlayed) : (scored / played),
-        awayAvgConceded: awayPlayed >= 3 ? (awayConceded / awayPlayed) : (conceded / played),
-        winRate: Math.round((wins / played) * 100),
-        homeWinRate: homePlayed > 0 ? Math.round((homeWins / homePlayed) * 100) : Math.round((wins / played) * 100),
-        awayWinRate: awayPlayed > 0 ? Math.round((awayWins / awayPlayed) * 100) : Math.round((wins / played) * 100),
-        ewmaForm: ewmaWeightSum > 0 ? Math.round((ewmaPoints / ewmaWeightSum) * 100) : 50
-    };
-}
-
-function runAllEngines() {
-    let matchName = document.getElementById('matchInput').value.trim();
-    if (!matchName || !matchName.includes('-')) {
-        alert("Lütfen maç adını araya tire (-) koyarak girin! (Örn: Chelsea - Leeds United)");
-        return;
-    }
-
-    let inHxG = parseNum('gHomeXg');
-    let inHxGA = parseNum('gHomeXga');
-    let inAxG = parseNum('gAwayXg');
-    let inAxGA = parseNum('gAwayXga');
-    let hasGoaloo = !isNaN(inHxG) && !isNaN(inHxGA) && !isNaN(inAxG) && !isNaN(inAxGA);
-
-    if ((!excelData || excelData.length === 0) && !hasGoaloo) {
-        alert("Lütfen 1. bölümden Excel arşiv dosyasını yükleyin VEYA 5. bölümden Goaloo xG/xGA verilerini girin!");
-        return;
-    }
-
-    let goalLine = parseFloat(document.getElementById('goalLineSelect').value) || 2.5;
-    let glStr = goalLine.toFixed(1);
-
-    document.getElementById('loadingText').style.display = 'block';
-    document.getElementById('resultsArea').style.display = 'none';
-    document.getElementById('warnBanner').style.display = 'none';
-
-    setTimeout(() => {
-        try {
-            let parts = matchName.split('-');
-            let homeTeam = parts[0].trim();
-            let awayTeam = parts[1].trim();
-            let homeTeamUpper = homeTeam.toUpperCase();
-            let awayTeamUpper = awayTeam.toUpperCase();
-
-            let homeFound = findTeamRows(excelData, homeTeam);
-            let awayFound = findTeamRows(excelData, awayTeam);
-
-            let seen = new Set();
-            let combinedRows = [];
-            [...homeFound.rows, ...awayFound.rows].forEach(r => {
-                if (!seen.has(r)) { seen.add(r); combinedRows.push(r); }
-            });
-
-            let homeStats = calcTeamStats(homeFound);
-            let awayStats = calcTeamStats(awayFound);
-            let scoreReadIssue = (homeFound.rows.length > 0 && !homeStats) || (awayFound.rows.length > 0 && !awayStats);
-
-            if (!homeStats && !awayStats && !hasGoaloo) {
-                document.getElementById('loadingText').style.display = 'none';
-                document.getElementById('warnBanner').style.display = 'block';
-                if (scoreReadIssue) {
-                    let sampleVal = colMap.msScore ? (combinedRows[0][colMap.msScore] || 'Boş') : 'Sütun bulunamadı';
-                    document.getElementById('warnBanner').innerHTML = `⚠️ Takımlar Excel'de bulundu (<b>${homeFound.rows.length + awayFound.rows.length}</b> satır), ancak <b>MS Skor</b> sütunu okunamadı! (Algılanan sütun: <b>${colMap.msScore || 'YOK'}</b>, Örnek değer: <b>${sampleVal}</b>).`;
-                } else {
-                    document.getElementById('warnBanner').innerHTML = `⚠️ <b>"${homeTeam}"</b> ve <b>"${awayTeam}"</b> Excel arşivinde bulunamadı ve Goaloo xG verisi girilmedi. Excel'deki takım adını kontrol edin veya 5. bölümden Goaloo xG/xGA değerlerini girin.`;
-                }
-                return;
-            }
-
-            if (!homeStats || !awayStats) {
-                document.getElementById('warnBanner').style.display = 'block';
-                if (scoreReadIssue) {
-                    document.getElementById('warnBanner').innerHTML = `ℹ️ <b>Bilgi:</b> Arşivdeki bazı satırlarda MS Skor okunamadı, eksik kısım Goaloo xG/xGA değerlerinden telafi edildi.`;
-                } else {
-                    document.getElementById('warnBanner').innerHTML = `ℹ️ <b>Bilgi:</b> ${!homeStats ? homeTeam : ''} ${(!homeStats && !awayStats) ? 've ' : ''}${!awayStats ? awayTeam : ''} Excel arşivinde bulunamadı. Eksik takım verisi girdiğiniz Goaloo xG/xGA değerlerinden telafi edildi.`;
-                }
-            }
-
-            let hInj = analyzeInjuryText(document.getElementById('homeInjuries').value);
-            let aInj = analyzeInjuryText(document.getElementById('awayInjuries').value);
-
-            // İç/Dış Saha Ağırlıklı Excel xG (%65 Saha Özel + %35 Genel)
-            let hExcelAtt = homeStats ? (homeStats.homeAvgScored * 0.65 + homeStats.avgScored * 0.35) : null;
-            let hExcelDef = homeStats ? (homeStats.homeAvgConceded * 0.65 + homeStats.avgConceded * 0.35) : null;
-            let aExcelAtt = awayStats ? (awayStats.awayAvgScored * 0.65 + awayStats.avgScored * 0.35) : null;
-            let aExcelDef = awayStats ? (awayStats.awayAvgConceded * 0.65 + awayStats.avgConceded * 0.35) : null;
-
-            let excelHomeXg = (hExcelAtt !== null && aExcelDef !== null) ? ((hExcelAtt + aExcelDef) / 2) * 1.06 : (hExcelAtt !== null ? hExcelAtt : null);
-            let excelAwayXg = (aExcelAtt !== null && hExcelDef !== null) ? ((aExcelAtt + hExcelDef) / 2) * 0.94 : (aExcelAtt !== null ? aExcelAtt : null);
-
-            let goalooHomeXg = hasGoaloo ? (inHxG + inAxGA) / 2 : null;
-            let goalooAwayXg = hasGoaloo ? (inAxG + inHxGA) / 2 : null;
-
-            let baseHomeXg, baseAwayXg;
-            if (excelHomeXg !== null && goalooHomeXg !== null) {
-                baseHomeXg = (excelHomeXg * 0.5) + (goalooHomeXg * 0.5);
-                baseAwayXg = (excelAwayXg * 0.5) + (goalooAwayXg * 0.5);
-            } else if (goalooHomeXg !== null) {
-                baseHomeXg = goalooHomeXg;
-                baseAwayXg = goalooAwayXg;
-            } else {
-                baseHomeXg = excelHomeXg !== null ? excelHomeXg : 1.35;
-                baseAwayXg = excelAwayXg !== null ? excelAwayXg : 1.05;
-            }
-
-            // V36.1: SAVUNMA ÇÖKÜŞÜ + OMURGA ÇÖKÜŞÜ + NET İLK 11 EKSİK FARKI
-            let hNetMissing = hInj.starterCount - aInj.starterCount;
-            let aNetMissing = aInj.starterCount - hInj.starterCount;
-
-            let hBackboneCollapse = !hInj.defCollapse && (
-                (hInj.defStarterCount >= 1 && hInj.gkStarterCount >= 1 && hNetMissing >= 1) ||
-                (hInj.starterCount >= 3 && hNetMissing >= 2)
-            );
-            let aBackboneCollapse = !aInj.defCollapse && (
-                (aInj.defStarterCount >= 1 && aInj.gkStarterCount >= 1 && aNetMissing >= 1) ||
-                (aInj.starterCount >= 3 && aNetMissing >= 2)
-            );
-
-            let singleHomeCollapse = hInj.defCollapse && !aInj.defCollapse;
-            let singleAwayCollapse = aInj.defCollapse && !hInj.defCollapse;
-            let bothDefCollapse = hInj.defCollapse && aInj.defCollapse;
-
-            let singleHomeBackbone = hBackboneCollapse && !aInj.defCollapse && !aBackboneCollapse;
-            let singleAwayBackbone = aBackboneCollapse && !hInj.defCollapse && !hBackboneCollapse;
-
-            let homeDefAdvRate = singleAwayCollapse ? 0.65 : (singleAwayBackbone ? 0.55 : (bothDefCollapse ? 0.25 : 0.32));
-            let awayDefAdvRate = singleHomeCollapse ? 0.65 : (singleHomeBackbone ? 0.55 : (bothDefCollapse ? 0.25 : 0.32));
-            let cautionFactor = bothDefCollapse ? 0.94 : 1.0;
-
-            let homeGapBoost = (!bothDefCollapse && aNetMissing >= 2) ? (1 + Math.min(0.12, (aNetMissing - 1) * 0.05)) : 1.0;
-            let awayGapBoost = (!bothDefCollapse && hNetMissing >= 2) ? (1 + Math.min(0.12, (hNetMissing - 1) * 0.05)) : 1.0;
-            let homeGapDrag = (!bothDefCollapse && hNetMissing >= 2) ? (1 - Math.min(0.10, (hNetMissing - 1) * 0.04)) : 1.0;
-            let awayGapDrag = (!bothDefCollapse && aNetMissing >= 2) ? (1 - Math.min(0.10, (aNetMissing - 1) * 0.04)) : 1.0;
-
-            let homeAttHealth = Math.max(0.70, 1 - hInj.attPen);
-            let awayAttHealth = Math.max(0.70, 1 - aInj.attPen);
-
-            let homeBoostMult = (1 + ((aInj.defPen * homeDefAdvRate) + aInj.gkPen) * homeAttHealth) * homeGapBoost;
-            let awayBoostMult = (1 + ((hInj.defPen * awayDefAdvRate) + hInj.gkPen) * awayAttHealth) * awayGapBoost;
-
-            let homeBoostPct = Math.round((homeBoostMult * cautionFactor - 1) * 100);
-            let awayBoostPct = Math.round((awayBoostMult * cautionFactor - 1) * 100);
-
-            baseHomeXg = Math.max(0.30, baseHomeXg * (1 - hInj.attPen) * homeGapDrag * homeBoostMult * cautionFactor);
-            baseAwayXg = Math.max(0.25, baseAwayXg * (1 - aInj.attPen) * awayGapDrag * awayBoostMult * cautionFactor);
-
-            // 8x8 GERÇEK DIXON-COLES MATRİSİ (rho = -0.13)
-            const RHO = -0.13;
-            let scoreMatrix = [];
-            let totalProb = 0, pHomeWin = 0, pDraw = 0, pAwayWin = 0, m1BttsProb = 0;
-            let m1Over15Prob = 0, m1Over25Prob = 0, m1Over35Prob = 0, m1Over45Prob = 0, m1SelectedOverProb = 0;
-
-            for (let h = 0; h <= 8; h++) {
-                for (let a = 0; a <= 8; a++) {
-                    let tau = dixonColesTau(h, a, baseHomeXg, baseAwayXg, RHO);
-                    let p = poissonProb(baseHomeXg, h) * poissonProb(baseAwayXg, a) * tau;
-                    scoreMatrix.push({home: h, away: a, prob: p});
-                    totalProb += p;
-                }
-            }
-
-            scoreMatrix.forEach(s => {
-                s.prob = s.prob / totalProb;
-                let tot = s.home + s.away;
-                if (s.home > s.away) pHomeWin += s.prob;
-                else if (s.home === s.away) pDraw += s.prob;
-                else pAwayWin += s.prob;
-                if (tot > 1.5) m1Over15Prob += s.prob;
-                if (tot > 2.5) m1Over25Prob += s.prob;
-                if (tot > 3.5) m1Over35Prob += s.prob;
-                if (tot > 4.5) m1Over45Prob += s.prob;
-                if (tot > goalLine) m1SelectedOverProb += s.prob;
-                if (s.home > 0 && s.away > 0) m1BttsProb += s.prob;
-            });
-            scoreMatrix.sort((a, b) => b.prob - a.prob);
-
-            let m1SelectedUnderProb = Math.max(0, 1 - m1SelectedOverProb);
-            let m1SelectedOverPct = Math.round(m1SelectedOverProb * 100);
-            let m1Over25Pct = Math.round(m1Over25Prob * 100);
-            let m1Over35Pct = Math.round(m1Over35Prob * 100);
-            let m1Over45Pct = Math.round(m1Over45Prob * 100);
-
-            let htHomeXg = baseHomeXg * 0.44;
-            let htAwayXg = baseAwayXg * 0.44;
-            let pHt1 = 0, pHtX = 0, pHt2 = 0, htTotalProb = 0, pHtOver05 = 0;
-            for (let h = 0; h <= 5; h++) {
-                for (let a = 0; a <= 5; a++) {
-                    let tauHt = dixonColesTau(h, a, htHomeXg, htAwayXg, -0.10);
-                    let p = poissonProb(htHomeXg, h) * poissonProb(htAwayXg, a) * tauHt;
-                    htTotalProb += p;
-                    if (h > a) pHt1 += p;
-                    else if (h === a) pHtX += p;
-                    else pHt2 += p;
-                    if ((h + a) > 0.5) pHtOver05 += p;
-                }
-            }
-            let m1Ht1Pct = Math.round((pHt1 / htTotalProb) * 100);
-            let m1HtXPct = Math.round((pHtX / htTotalProb) * 100);
-            let m1Ht2Pct = Math.max(0, 100 - m1Ht1Pct - m1HtXPct);
-            let m1HtOver05Pct = Math.round((pHtOver05 / htTotalProb) * 100);
-            let m1HtTarafPick = (m1Ht1Pct >= m1HtXPct && m1Ht1Pct >= m1Ht2Pct) ? "İY 1" : ((m1Ht2Pct >= m1HtXPct && m1Ht2Pct > m1Ht1Pct) ? "İY 2" : "İY X");
-
-            let m1BttsPct = Math.round(m1BttsProb * 100);
-            let m1TarafPick = (pHomeWin >= pAwayWin && pHomeWin >= pDraw) ? "MS 1" : ((pAwayWin > pHomeWin && pAwayWin >= pDraw) ? "MS 2" : "MS 0");
-            let m1TarafProb = Math.max(pHomeWin, pDraw, pAwayWin);
-            let m1TarafConf = Math.round(m1TarafProb * 100);
-
-            let m1Note = '';
-            if (singleHomeCollapse) m1Note = ` <span style="color:var(--accent-cyan);">(${awayTeam} +%${awayBoostPct} savunma avantajı)</span>`;
-            else if (singleAwayCollapse) m1Note = ` <span style="color:var(--accent-cyan);">(${homeTeam} +%${homeBoostPct} savunma avantajı)</span>`;
-            else if (singleHomeBackbone) m1Note = ` <span style="color:var(--accent-purple);">(${awayTeam} +%${awayBoostPct} omurga avantajı)</span>`;
-            else if (singleAwayBackbone) m1Note = ` <span style="color:var(--accent-purple);">(${homeTeam} +%${homeBoostPct} omurga avantajı)</span>`;
-            else if (bothDefCollapse) m1Note = ` <span style="color:var(--accent-orange);">(Çift savunma eksiği: Temkinli oyun freni)</span>`;
-
-            document.getElementById('m1Text').innerHTML = `<b>Dixon-Coles xG:</b> Ev: <b>${baseHomeXg.toFixed(2)}</b> | Dep: <b>${baseAwayXg.toFixed(2)}</b> (Toplam: <b>${(baseHomeXg + baseAwayXg).toFixed(2)}</b>)${m1Note}`;
-            let gridHtml = '';
-            scoreMatrix.slice(0, 6).forEach(s => { gridHtml += `<div class="score-item"><div class="sc">${s.home}-${s.away}</div><div class="pr">%${(s.prob*100).toFixed(1)}</div></div>`; });
-            document.getElementById('scoreGrid').innerHTML = gridHtml;
-            document.getElementById('m1PredictionsText').innerHTML = `
-                🎯 <b>Taraf Bahsi:</b> ${m1TarafPick} (MS1:%${Math.round(pHomeWin*100)} | MS0:%${Math.round(pDraw*100)} | MS2:%${Math.round(pAwayWin*100)}) <br>
-                • <b>İlk Yarı Taraf:</b> ${m1HtTarafPick} (İY1:%${m1Ht1Pct} | İYX:%${m1HtXPct} | İY2:%${m1Ht2Pct}) <br>
-                • <b>Seçili Barem (${glStr} Gol):</b> <span style="color:var(--accent-gold); font-weight:bold;">${m1SelectedOverPct >= 50 ? "ÜST" : "ALT"} (%${m1SelectedOverPct >= 50 ? m1SelectedOverPct : 100-m1SelectedOverPct})</span> <br>
-                • <b>Tüm Gol Baremleri:</b> 2.5Ü: %${m1Over25Pct} | 3.5Ü: %${m1Over35Pct} | 4.5Ü: %${m1Over45Pct} <br>
-                • <b>KG:</b> ${m1BttsPct >= 50 ? "VAR" : "YOK"} (%${m1BttsPct >= 50 ? m1BttsPct : 100-m1BttsPct})
-            `;
-
-            // MOTOR 2: ARŞİV HESAPLARI
-            let overSelCount = 0, over25Count = 0, over35Count = 0, over45Count = 0, bttsCount = 0, ht05Count = 0, validRows = 0;
-            let ht1Count = 0, htXCount = 0, ht2Count = 0, validHtRows = 0;
-
-            combinedRows.forEach(r => {
-                let sc = getRowMsScore(r);
-                if (sc) {
-                    validRows++;
-                    let tot = sc.h + sc.a;
-                    if (tot > goalLine) overSelCount++;
-                    if (tot > 2.5) over25Count++;
-                    if (tot > 3.5) over35Count++;
-                    if (tot > 4.5) over45Count++;
-                    if (sc.h > 0 && sc.a > 0) bttsCount++;
-                }
-                let scIy = getRowHtScore(r);
-                if (scIy) {
-                    validHtRows++;
-                    if ((scIy.h + scIy.a) > 0.5) ht05Count++;
-                    if (scIy.h > scIy.a) ht1Count++;
-                    else if (scIy.h === scIy.a) htXCount++;
-                    else ht2Count++;
-                }
-            });
-
-            let m2HasData = validRows > 0;
-            let m2SelectedOverPct = m2HasData ? Math.round((overSelCount / validRows) * 100) : m1SelectedOverPct;
-            let m2Over25Pct = m2HasData ? Math.round((over25Count / validRows) * 100) : m1Over25Pct;
-            let m2Over35Pct = m2HasData ? Math.round((over35Count / validRows) * 100) : m1Over35Pct;
-            let m2Over45Pct = m2HasData ? Math.round((over45Count / validRows) * 100) : m1Over45Pct;
-            let m2BttsPct = m2HasData ? Math.round((bttsCount / validRows) * 100) : m1BttsPct;
-            let m2Ht05Pct = validHtRows > 0 ? Math.round((ht05Count / validHtRows) * 100) : m1HtOver05Pct;
-            let m2Ht1Pct = validHtRows > 0 ? Math.round((ht1Count / validHtRows) * 100) : m1Ht1Pct;
-            let m2HtXPct = validHtRows > 0 ? Math.round((htXCount / validHtRows) * 100) : m1HtXPct;
-            let m2Ht2Pct = validHtRows > 0 ? Math.max(0, 100 - m2Ht1Pct - m2HtXPct) : m1Ht2Pct;
-            let m2HtTarafPick = (m2Ht1Pct >= m2HtXPct && m2Ht1Pct >= m2Ht2Pct) ? "İY 1" : ((m2Ht2Pct >= m2HtXPct && m2Ht2Pct > m2Ht1Pct) ? "İY 2" : "İY X");
-
-            if (m2HasData) {
-                document.getElementById('m2Text').innerHTML = `Arşivde <b>${homeFound.matchedLabel || homeTeam}</b> (${homeFound.rows.length} maç) ve <b>${awayFound.matchedLabel || awayTeam}</b> (${awayFound.rows.length} maç) için toplam <b>${validRows}</b> gerçek MS skoru işlendi.`;
-            } else {
-                document.getElementById('m2Text').innerHTML = `⚠️ Arşivde bu takımlara ait okunabilir skor bulunamadı. Arşiv ağırlığı otomatik %0'a çekildi.`;
-            }
-
-            document.getElementById('statsGrid').innerHTML = `
-                <div class="stat-card"><div class="val">%${m2SelectedOverPct}</div><div class="lbl">${glStr} ÜST İHTİMALİ</div></div>
-                <div class="stat-card"><div class="val">%${100-m2SelectedOverPct}</div><div class="lbl">${glStr} ALT İHTİMALİ</div></div>
-                <div class="stat-card"><div class="val">%${m2BttsPct}</div><div class="lbl">KG VAR İHTİMALİ</div></div>
-                <div class="stat-card"><div class="val">%${m2Ht05Pct}</div><div class="lbl">İLK YARI 0.5 ÜST</div></div>
-            `;
-            document.getElementById('m2HtText').innerHTML = `
-                📊 <b>Arşiv Gol Baremleri:</b> 2.5Ü: %${m2Over25Pct} | 3.5Ü: %${m2Over35Pct} | 4.5Ü: %${m2Over45Pct}<br>
-                ⏳ <b>Arşiv İlk Yarı Taraf:</b> ${m2HtTarafPick} (İY1: %${m2Ht1Pct} | İYX: %${m2HtXPct} | İY2: %${m2Ht2Pct})
-            `;
-
-            // MOTOR 3 & 4: ADİL ORAN VE +EV
-            let fairMs1 = (1 / Math.max(0.02, pHomeWin)).toFixed(2);
-            let fairMs0 = (1 / Math.max(0.02, pDraw)).toFixed(2);
-            let fairMs2 = (1 / Math.max(0.02, pAwayWin)).toFixed(2);
-            let fairSelOver = (1 / Math.max(0.02, m1SelectedOverProb)).toFixed(2);
-            let fairSelUnder = (1 / Math.max(0.02, m1SelectedUnderProb)).toFixed(2);
-            let fairO25 = (1 / Math.max(0.02, m1Over25Prob)).toFixed(2);
-            let fairO35 = (1 / Math.max(0.02, m1Over35Prob)).toFixed(2);
-            let fairO45 = (1 / Math.max(0.02, m1Over45Prob)).toFixed(2);
-
-            let odd1 = parseNum('oddMs1');
-            let odd0 = parseNum('oddMs0');
-            let odd2 = parseNum('oddMs2');
-            let oddGoalOver = parseNum('oddGoalOver');
-            let oddGoalUnder = parseNum('oddGoalUnder');
-
-            let m3Html = `
-                <b>Taraf Adil Oranları:</b> MS1: <b>${fairMs1}</b> | MS0: <b>${fairMs0}</b> | MS2: <b>${fairMs2}</b><br>
-                <b>Seçili Barem (${glStr}):</b> ${glStr} Üst: <b style="color:var(--accent-gold);">${fairSelOver}</b> | ${glStr} Alt: <b>${fairSelUnder}</b><br>
-                <span style="font-size:11px; color:var(--text-muted);">Referans Adil Oranlar ➔ 2.5Ü: ${fairO25} | 3.5Ü: ${fairO35} | 4.5Ü: ${fairO45}</span><br>
-            `;
-
-            let evList = [];
-            const KELLY_CAP = 5.0;
-
-            function checkEV(label, prob, mktOdd) {
-                if (isNaN(mktOdd) || mktOdd <= 1.01) return null;
-                let ev = (prob * mktOdd) - 1;
-                let evPct = (ev * 100).toFixed(1);
-                let rawKelly = ev > 0 ? (((mktOdd - 1) * prob - (1 - prob)) / (mktOdd - 1)) * 0.25 * 100 : 0;
-                rawKelly = Math.max(0, rawKelly);
-                let cappedKelly = Math.min(KELLY_CAP, rawKelly);
-                return { label, prob, mktOdd, ev, evPct, rawKelly, kelly: cappedKelly, isCapped: rawKelly > KELLY_CAP };
-            }
-
-            let ev1 = checkEV("MS 1", pHomeWin, odd1);
-            let ev0 = checkEV("MS 0", pDraw, odd0);
-            let ev2 = checkEV("MS 2", pAwayWin, odd2);
-            let evOver = checkEV(`${glStr} ÜST`, m1SelectedOverProb, oddGoalOver);
-            let evUnder = checkEV(`${glStr} ALT`, m1SelectedUnderProb, oddGoalUnder);
-            [ev1, ev0, ev2, evOver, evUnder].forEach(x => { if (x) evList.push(x); });
-
-            if (evList.length > 0) {
-                m3Html += `⚡ Girilen piyasa oranları <b>${glStr}</b> baremine göre adil oranlarla karşılaştırıldı.`;
-                let m4Html = '';
-                evList.forEach(item => {
-                    let color = item.ev > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-                    let tag = item.ev > 0 ? '✅ +EV DEĞER VAR' : '❌ -EV DÜŞÜK ORAN';
-                    m4Html += `• <b>${item.label}</b> (Oran: ${item.mktOdd.toFixed(2)} | İhtimal: %${(item.prob*100).toFixed(1)}): <span style="color:${color}; font-weight:bold;">${item.ev > 0 ? '+' : ''}%${item.evPct} ${tag}</span><br>`;
-                });
-                document.getElementById('m4Text').innerHTML = m4Html;
-            } else {
-                m3Html += `ℹ️ 6. bölüme güncel piyasa oranlarını girerseniz piyasa sapması ve +EV otomatik hesaplanır.`;
-                document.getElementById('m4Text').innerHTML = `💎 Değer oranı tespiti için 6. bölüme büro oranlarını girin. Adil eşikler: <b>${m1TarafPick} &gt; ${(1/m1TarafProb).toFixed(2)}</b> | <b>${glStr} ÜST &gt; ${fairSelOver}</b>`;
-            }
-            document.getElementById('m3Text').innerHTML = m3Html;
-
-            // MOTOR 5: SAVUNMA & OMURGA ÖZETİ
-            let hFormStr = homeStats ? `%${homeStats.ewmaForm} (${homeStats.played} maç)` : "Arşiv verisi yok";
-            let aFormStr = awayStats ? `%${awayStats.ewmaForm} (${awayStats.played} maç)` : "Arşiv verisi yok";
-            let advLines = [];
-            if (bothDefCollapse) {
-                advLines.push(`⚖️ <b>Çift Savunma Çöküşü:</b> Her iki takımda da 2+ savunma eksiği olduğundan karşılıklı xG şişirmesi kısıldı (Temkinli Oyun Freni).`);
-            } else {
-                if (homeBoostPct >= 8) {
-                    let tagType = singleAwayCollapse ? 'savunma çöküşü' : (singleAwayBackbone ? 'omurga çöküşü' : 'kadro eksikleri');
-                    advLines.push(`⚡ <b>${homeTeam}</b>, rakip ${tagType} ile <b>+%${homeBoostPct} xG avantajı</b> kazandı.`);
-                }
-                if (awayBoostPct >= 8) {
-                    let tagType = singleHomeCollapse ? 'savunma çöküşü' : (singleHomeBackbone ? 'omurga çöküşü' : 'kadro eksikleri');
-                    advLines.push(`⚡ <b>${awayTeam}</b>, rakip ${tagType} ile <b>+%${awayBoostPct} xG avantajı</b> kazandı.`);
-                }
-            }
-            let advSummary = advLines.length > 0 ? `<br>${advLines.join('<br>')}` : '';
-
-            document.getElementById('m5Text').innerHTML = `
-                🏥 <b>${homeTeam}:</b> ${hInj.note} | <b>EWMA Form:</b> ${hFormStr}<br>
-                🏥 <b>${awayTeam}:</b> ${aInj.note} | <b>EWMA Form:</b> ${aFormStr}${advSummary}
-            `;
-
-            // MOTOR 6
-            let pAhHomeM05 = 0, pAhHomeM15 = 0, pAhAwayP05 = 0, pAhAwayM05 = 0;
-            scoreMatrix.forEach(s => {
-                let diff = s.home - s.away;
-                if (diff >= 1) pAhHomeM05 += s.prob;
-                if (diff >= 2) pAhHomeM15 += s.prob;
-                if (diff <= 0) pAhAwayP05 += s.prob;
-                if (diff <= -1) pAhAwayM05 += s.prob;
-            });
-            let bestAhProb = pAhHomeM05 >= 0.55 ? pAhHomeM05 : (pAhAwayM05 >= 0.52 ? pAhAwayM05 : pAhAwayP05);
-            let bestAh = pAhHomeM05 >= 0.55 ? `${homeTeam} -0.5 AH (%${Math.round(pAhHomeM05*100)})`
-                       : (pAhAwayM05 >= 0.52 ? `${awayTeam} -0.5 AH (%${Math.round(pAhAwayM05*100)})`
-                       : `${awayTeam} +0.5 AH (%${Math.round(pAhAwayP05*100)})`);
-            document.getElementById('m6Text').innerHTML = `
-                ⚖️ <b>Ev -0.5 AH:</b> %${Math.round(pAhHomeM05*100)} | <b>Ev -1.5 AH:</b> %${Math.round(pAhHomeM15*100)}<br>
-                ⚖️ <b>Dep +0.5 AH:</b> %${Math.round(pAhAwayP05*100)} | <b>Dep -0.5 AH:</b> %${Math.round(pAhAwayM05*100)}<br>
-                🎯 <b>Önerilen Handikap:</b> <span style="color:var(--accent-yellow); font-weight:bold;">${bestAh}</span>
-            `;
-
-            // MOTOR 7
-            let totalXg = baseHomeXg + baseAwayXg;
-            let xgGap = Math.abs(baseHomeXg - baseAwayXg);
-            let tempoLabel = totalXg >= 2.85 ? "YÜKSEK TEMPO (Açık Oyun)" : (totalXg >= 2.25 ? "ORTA TEMPO (Dengeli)" : "DÜŞÜK TEMPO (Kapalı/Sert)");
-            let cardRisk = xgGap < 0.35 ? "YÜKSEK (Kafa Kafaya Mücadele ➔ 4.5 Üst Kart Eğilimi)" : (xgGap < 0.75 ? "ORTA (3.5 - 4.5 Kart Bandı)" : "DÜŞÜK (Tek Taraflı Oyun)");
-            document.getElementById('m7Text').innerHTML = `
-                ⚡ <b>Beklenen Tempo:</b> ${tempoLabel} (Toplam xG: ${totalXg.toFixed(2)})<br>
-                🟨 <b>Sertlik / Kart Profili:</b> ${cardRisk}
-            `;
-
-            // MOTOR 8
-            let hHomeWin = homeStats ? `%${homeStats.homeWinRate}` : "Veri Yok";
-            let aAwayWin = awayStats ? `%${awayStats.awayWinRate}` : "Veri Yok";
-            let sahaYorum = (homeStats && awayStats)
-                ? (homeStats.homeWinRate > awayStats.awayWinRate + 15 ? `${homeTeam} iç sahada belirgin üstün.` : (awayStats.awayWinRate > homeStats.homeWinRate + 10 ? `${awayTeam} deplasmanda çok dirençli.` : `İç/dış saha güçleri dengeli.`))
-                : "Saha kıyaslaması için her iki takımın Excel verisi gereklidir.";
-            document.getElementById('m8Text').innerHTML = `
-                🏟️ <b>${homeTeam} İç Saha Galibiyet:</b> ${hHomeWin} | <b>${awayTeam} Dep. Galibiyet:</b> ${aAwayWin}<br>
-                📊 <b>Değerlendirme:</b> ${sahaYorum}
-            `;
-
-            // MOTOR 9
-            let remXg20 = totalXg * (70 / 90);
-            let pOver05After20 = Math.round((1 - Math.exp(-remXg20)) * 100);
-            let pOver15After20 = Math.round((1 - (Math.exp(-remXg20) * (1 + remXg20))) * 100);
-            let lateGoalProb = Math.round((1 - Math.exp(-(totalXg * (20 / 90)))) * 100);
-            document.getElementById('m9Text').innerHTML = `
-                ⏱️ <b>20. Dakika 0-0 Geçilirse:</b> Maçta 0.5 Üst ihtimali <b>%${pOver05After20}</b>, 1.5 Üst ihtimali <b>%${pOver15After20}</b>.<br>
-                🔥 <b>70. Dakika Sonrası Gol İhtimali:</b> <b>%${lateGoalProb}</b> (Geç gol senaryosu).
-            `;
-
-            // MOTOR 12: GOALOO ANALİZİ
-            let hXgVal = hasGoaloo ? inHxG : (homeStats ? homeStats.avgScored : 1.40);
-            let hXgaVal = hasGoaloo ? inHxGA : (homeStats ? homeStats.avgConceded : 1.15);
-            let aXgVal = hasGoaloo ? inAxG : (awayStats ? awayStats.avgScored : 1.20);
-            let aXgaVal = hasGoaloo ? inAxGA : (awayStats ? awayStats.avgConceded : 1.25);
-
-            let rawEvGol = (hXgVal + aXgaVal) / 2;
-            let rawDepGol = (aXgVal + hXgaVal) / 2;
-            let adjEvGol = Math.max(0.30, rawEvGol * (1 - hInj.attPen * 0.85) * homeGapDrag * homeBoostMult * cautionFactor);
-            let adjDepGol = Math.max(0.25, rawDepGol * (1 - aInj.attPen * 0.85) * awayGapDrag * awayBoostMult * cautionFactor);
-            let beklenenGolNum = adjEvGol + adjDepGol;
-            let beklenenGol = beklenenGolNum.toFixed(2);
-            let rawBeklenenGol = (rawEvGol + rawDepGol).toFixed(2);
-
-            let fStateH = homeStats ? homeStats.ewmaForm : Math.min(95, Math.max(30, Math.round(50 + (hXgVal - hXgaVal) * 20)));
-            let fAttackH = Math.min(98, Math.max(20, Math.round((45 + hXgVal * 24) * (1 - hInj.attPen * 0.5) * homeGapDrag * Math.min(1.20, homeBoostMult * cautionFactor))));
-            let fDefH = Math.min(98, Math.max(12, Math.round((92 - hXgaVal * 26) * (1 - (hInj.defPen * 0.85 + hInj.gkPen * 0.5)))));
-
-            let fStateA = awayStats ? awayStats.ewmaForm : Math.min(95, Math.max(30, Math.round(50 + (aXgVal - aXgaVal) * 20)));
-            let fAttackA = Math.min(98, Math.max(20, Math.round((45 + aXgVal * 24) * (1 - aInj.attPen * 0.5) * awayGapDrag * Math.min(1.20, awayBoostMult * cautionFactor))));
-            let fDefA = Math.min(98, Math.max(12, Math.round((92 - aXgaVal * 26) * (1 - (aInj.defPen * 0.85 + aInj.gkPen * 0.5)))));
-
-            let hPowerScore = (fStateH * 0.40) + (fAttackH * 0.30) + (fDefH * 0.30);
-            let aPowerScore = (fStateA * 0.40) + (fAttackA * 0.30) + (fDefA * 0.30);
-            let m12TarafRes = hPowerScore > aPowerScore + 6 ? "MS 1" : (aPowerScore > hPowerScore + 6 ? "MS 2" : "MS 0 (Beraberlik)");
-
-            let m5SelectedOverPct = Math.round(poissonOverTotalProb(beklenenGolNum, goalLine) * 100);
-            let m12GoalRes = m5SelectedOverPct >= 50 ? `${glStr} ÜST` : `${glStr} ALT`;
-            let m12BttsRes = (adjEvGol >= 0.95 && adjDepGol >= 0.85) ? "KG VAR" : "KG YOK";
-            let m12Home15Prob = Math.round((1 - (poissonProb(adjEvGol, 0) + poissonProb(adjEvGol, 1))) * 100);
-            let m12Away15Prob = Math.round((1 - (poissonProb(adjDepGol, 0) + poissonProb(adjDepGol, 1))) * 100);
-            let m12Home15 = m12Home15Prob >= 50 ? `EVET (%${m12Home15Prob})` : `HAYIR (%${100 - m12Home15Prob})`;
-            let m12Away15 = m12Away15Prob >= 50 ? `EVET (%${m12Away15Prob})` : `HAYIR (%${100 - m12Away15Prob})`;
-
-            document.getElementById('m12Text').innerHTML = `
-                📶 <b>Güç Kıyaslaması (State - Attack - Defence):</b><br>
-                • <b>Ev Sahibi:</b> Form %${fStateH} | Hücum %${fAttackH} | Savunma %${fDefH}<br>
-                • <b>Deplasman:</b> Form %${fStateA} | Hücum %${fAttackA} | Savunma %${fDefA}<br><br>
-                <span class="m12-subtit">🎯 Motor 12 Kesin Tahminleri (Seçili Barem: ${glStr}):</span>
-                • <b>Taraf Bahsi:</b> ${m12TarafRes}<br>
-                • <b>Alt / Üst:</b> ${m12GoalRes} (Düzeltilmiş Beklenen: <b>${beklenenGol}</b> | Ham: ${rawBeklenenGol})<br>
-                • <b>KG Var / Yok:</b> ${m12BttsRes}<br>
-                • <b>Ev Sahibi 1.5 Üst:</b> ${m12Home15}<br>
-                • <b>Deplasman 1.5 Üst:</b> ${m12Away15}
-            `;
-
-            // MOTOR 11: DİNAMİK AĞIRLIK VE OMURGA / KADRO YÖNELİMİ
-            let formGap = Math.abs(fStateH - fStateA);
-            let defInjuryImpact = (hInj.defStarterCount + aInj.defStarterCount) * 4.5 + (hInj.defCollapse ? 5 : 0) + (aInj.defCollapse ? 5 : 0);
-            let backboneImpact = (hBackboneCollapse ? 6 : 0) + (aBackboneCollapse ? 6 : 0);
-            let gkInjuryImpact = (hInj.gkStarterCount + aInj.gkStarterCount) * 1.5;
-            let otherInjuryImpact = (hInj.attMidStarterCount + aInj.attMidStarterCount) * 1.2;
-
-            let rawW1 = (!m2HasData ? 38 : 30) + (!hasGoaloo ? 8 : 0);
-            let rawW2 = validRows === 0 ? 0 : (validRows < 10 ? 12 : (validRows < 20 ? 19 : (validRows >= 35 ? 27 : 23)));
-            let rawW3 = 10 + Math.min(20, defInjuryImpact + backboneImpact + gkInjuryImpact + otherInjuryImpact) + (formGap >= 25 ? 4 : (formGap >= 15 ? 2 : 0));
-            let rawW4 = (evList.length > 0 || bestAhProb >= 0.62) ? 12 : 9;
-            let rawW5 = !hasGoaloo ? 5 : (validRows < 10 ? 24 : 20);
-
-            let dynW = normalizeWeights({ w1: rawW1, w2: rawW2, w3: rawW3, w4: rawW4, w5: rawW5 });
-
-            let m3GoalSignalPct = m1SelectedOverPct;
-            if (singleHomeCollapse || singleAwayCollapse) {
-                m3GoalSignalPct = Math.min(90, m1SelectedOverPct + 8);
-            } else if (singleHomeBackbone || singleAwayBackbone) {
-                m3GoalSignalPct = Math.min(88, m1SelectedOverPct + 5);
-            } else if (bothDefCollapse) {
-                m3GoalSignalPct = Math.max(20, m1SelectedOverPct - 4);
-            }
-            let m4GoalSignalPct = m1SelectedOverPct;
-
-            let finalSelOverPct = Math.round(
-                (dynW.w1 * m1SelectedOverPct +
-                 dynW.w2 * m2SelectedOverPct +
-                 dynW.w3 * m3GoalSignalPct +
-                 dynW.w4 * m4GoalSignalPct +
-                 dynW.w5 * m5SelectedOverPct) / 100
-            );
-            let finalGoalPick = finalSelOverPct >= 50 ? `${glStr} ÜST` : `${glStr} ALT`;
-            let finalGoalConf = finalSelOverPct >= 50 ? finalSelOverPct : 100 - finalSelOverPct;
-            let goalAgree = (m1SelectedOverPct >= 50 && m2SelectedOverPct >= 50) || (m1SelectedOverPct < 50 && m2SelectedOverPct < 50);
-
-            let k3Direction = fStateH >= fStateA ? 'Ev Formda' : 'Dep Formda';
-            if (singleHomeCollapse || singleHomeBackbone || (!bothDefCollapse && hNetMissing >= 2)) k3Direction = 'Dep Avantaj';
-            else if (singleAwayCollapse || singleAwayBackbone || (!bothDefCollapse && aNetMissing >= 2)) k3Direction = 'Ev Avantaj';
-            else if (bothDefCollapse) k3Direction = 'Temkinli / Dengeli';
-
-            let k3Summary = `EWMA: Ev %${fStateH} vs Dep %${fStateA}`;
-            if (bothDefCollapse) k3Summary += ` • ⚠️ Çift Sav. Eksiği`;
-            else if (singleHomeCollapse) k3Summary += ` • 🚨 Ev Sav. Çöküş`;
-            else if (singleAwayCollapse) k3Summary += ` • 🚨 Dep Sav. Çöküş`;
-            else if (singleHomeBackbone) k3Summary += ` • ⚡ Ev Omurga Çöküşü`;
-            else if (singleAwayBackbone) k3Summary += ` • ⚡ Dep Omurga Çöküşü`;
-
-            document.getElementById('optaTableBody').innerHTML = `
-                <tr>
-                    <td><b>1) Dixon-Coles xG</b></td>
-                    <td>Ev ${baseHomeXg.toFixed(2)} - Dep ${baseAwayXg.toFixed(2)} xG (${glStr}Ü %${m1SelectedOverPct})</td>
-                    <td style="text-align:center;"><span class="opta-badge">${m1TarafPick} (%${m1TarafConf})</span></td>
-                    <td class="opta-weight">%${dynW.w1}</td>
-                </tr>
-                <tr>
-                    <td><b>2) Excel Arşiv</b></td>
-                    <td>${validRows} gerçek maç tarandı (${glStr}Ü %${m2SelectedOverPct})</td>
-                    <td style="text-align:center;"><span class="opta-badge">${m2HasData ? (m2SelectedOverPct >= 50 ? glStr + ' ÜST' : glStr + ' ALT') : 'Veri Yok'}</span></td>
-                    <td class="opta-weight">%${dynW.w2}</td>
-                </tr>
-                <tr>
-                    <td><b>3) Kadro & Omurga</b></td>
-                    <td>${k3Summary}</td>
-                    <td style="text-align:center;"><span class="opta-badge">${k3Direction}</span></td>
-                    <td class="opta-weight">%${dynW.w3}</td>
-                </tr>
-                <tr>
-                    <td><b>4) Asya Handikap</b></td>
-                    <td>En güvenli çizgi: ${bestAh}</td>
-                    <td style="text-align:center;"><span class="opta-badge">AH Onay</span></td>
-                    <td class="opta-weight">%${dynW.w4}</td>
-                </tr>
-                <tr>
-                    <td><b>5) Goaloo Çapraz</b></td>
-                    <td>Düzeltilmiş Gol: ${beklenenGol} (${glStr}Ü %${m5SelectedOverPct})</td>
-                    <td style="text-align:center;"><span class="opta-badge">${hasGoaloo ? m12GoalRes : 'Tahmini'}</span></td>
-                    <td class="opta-weight">%${dynW.w5}</td>
-                </tr>
-                <tr class="opta-final-row">
-                    <td class="opta-final-title">DİNAMİK SENTEZ KARARI</td>
-                    <td>Adil Oran: ${(1/m1TarafProb).toFixed(2)} • Kesin Skor: ${scoreMatrix[0].home}-${scoreMatrix[0].away} & ${scoreMatrix[1].home}-${scoreMatrix[1].away}</td>
-                    <td style="text-align: center;"><span class="opta-badge" style="background:#ff9900;border-color:#ff9900;color:#000;">${m1TarafPick} / ${finalGoalPick}</span></td>
-                    <td class="opta-weight" style="color:var(--accent-green);">%${dynW.w1 + dynW.w2 + dynW.w3 + dynW.w4 + dynW.w5}</td>
-                </tr>
-            `;
-
-            // MOTOR 10: YÖN UYUMLU VE GÜVEN TAVANLI KELLY KASA
-            let kellyTaraf = 0, kellyTarafCapNote = "", kellyGoal = 0, kellyGoalCapNote = "", kellyNote = "";
-            let pickedTarafEv = m1TarafPick === "MS 1" ? ev1 : (m1TarafPick === "MS 2" ? ev2 : ev0);
-
-            if (pickedTarafEv) {
-                kellyTaraf = pickedTarafEv.kelly;
-                if (pickedTarafEv.isCapped) kellyTarafCapNote = ` <span style="font-size:11px; color:var(--accent-orange);">(Ham %${pickedTarafEv.rawKelly.toFixed(1)} ➔ %5 tavan)</span>`;
-                kellyNote = "Gerçek piyasa oranlarıyla 1/4 Fractional Kelly + Gol Güven Filtresi uygulandı.";
-            } else {
-                kellyTaraf = m1TarafConf > 52 ? Math.min(KELLY_CAP, (m1TarafConf - 48) * 0.18) : 0;
-                kellyNote = "Eksik oran alanları için model güven eşiğine göre sınırlı kasa önerisi verildi.";
-            }
-
-            let goalPickIsOver = finalGoalPick === `${glStr} ÜST`;
-            let targetGoalEv = goalPickIsOver ? evOver : evUnder;
-            let oppGoalEv = goalPickIsOver ? evUnder : evOver;
-
-            let goalKellyCap = KELLY_CAP;
-            let goalCapLabel = "";
-            if (finalGoalConf < 55) {
-                goalKellyCap = 0.0;
-                goalCapLabel = "güven <%55 ➔ Pas";
-            } else if (finalGoalConf < 60 || !goalAgree) {
-                goalKellyCap = 1.5;
-                goalCapLabel = !goalAgree ? "karma sentez %1.5 tavan" : "güven <%60 ➔ %1.5 tavan";
-            }
-
-            if (targetGoalEv) {
-                let rawG = targetGoalEv.rawKelly;
-                kellyGoal = Math.min(goalKellyCap, rawG);
-                if (rawG > 0 && goalKellyCap === 0) {
-                    kellyGoalCapNote = ` <span style="font-size:11px; color:var(--accent-orange);">(Ham %${rawG.toFixed(1)} ➔ ${goalCapLabel})</span>`;
-                } else if (rawG > goalKellyCap) {
-                    kellyGoalCapNote = ` <span style="font-size:11px; color:var(--accent-orange);">(Ham %${rawG.toFixed(1)} ➔ ${goalCapLabel || '%5 tavan'})</span>`;
-                }
-            } else if (!evOver && !evUnder) {
-                let rawG = finalGoalConf >= 55 ? Math.min(4.5, (finalGoalConf - 50) * 0.18) : 0;
-                kellyGoal = Math.min(goalKellyCap, rawG);
-                if (rawG > goalKellyCap && goalKellyCap > 0) {
-                    kellyGoalCapNote = ` <span style="font-size:11px; color:var(--accent-orange);">(${goalCapLabel})</span>`;
-                }
-            } else {
-                kellyGoal = 0;
-                if (oppGoalEv && oppGoalEv.ev > 0) {
-                    kellyGoalCapNote = ` <span style="font-size:11px; color:var(--text-muted);">(Ters yön ${oppGoalEv.label} oranlı; seçilen yön ${finalGoalPick} pas)</span>`;
-                }
-            }
-
-            let totalKellyNum = kellyTaraf + kellyGoal;
-            let totalKelly = totalKellyNum.toFixed(1);
-            document.getElementById('m10Text').innerHTML = `
-                💰 <b>Taraf (${m1TarafPick}) Kasa:</b> ${kellyTaraf > 0 ? '%' + kellyTaraf.toFixed(1) + kellyTarafCapNote : '<span style="color:var(--accent-orange);">%0.0 (Pas Geç)</span>'}<br>
-                💰 <b>Gol (${finalGoalPick}) Kasa:</b> ${kellyGoal > 0 ? '%' + kellyGoal.toFixed(1) + kellyGoalCapNote : '<span style="color:var(--accent-orange);">%0.0 (Pas Geç)</span>' + kellyGoalCapNote}<br>
-                ℹ️ ${kellyNote}
-            `;
-
-            // ÜÇLÜ SENTEZ MÜHRÜ (YEŞİL TAHMİN KUTUSU)
-            document.getElementById('consensusTitle').innerHTML = `👑 ${homeTeamUpper} - ${awayTeamUpper} 👑<br><span style="font-size:12px; color:#fff; font-weight:normal; letter-spacing:1px; opacity: 0.9;">ÜÇLÜ SENTEZ MÜHRÜ (M1 + M2 + KELLY // BAREM ${glStr})</span>`;
-
-            let bttsW1 = m2HasData ? (dynW.w1 + dynW.w3 + dynW.w5) : 100;
-            let bttsW2 = m2HasData ? (dynW.w2 + dynW.w4) : 0;
-            let finalBttsPct = Math.round((m1BttsPct * bttsW1 + m2BttsPct * bttsW2) / (bttsW1 + bttsW2));
-            let finalBttsPick = finalBttsPct >= 50 ? "KG VAR" : "KG YOK";
-            let finalBttsConf = finalBttsPct >= 50 ? finalBttsPct : 100 - finalBttsPct;
-
-            let finalHt05Pct = Math.round((m1HtOver05Pct * bttsW1 + m2Ht05Pct * bttsW2) / (bttsW1 + bttsW2));
-            let finalHt05Pick = finalHt05Pct >= 50 ? "İY 0.5 ÜST" : "İY 0.5 ALT";
-            let finalHt05Conf = finalHt05Pct >= 50 ? finalHt05Pct : 100 - finalHt05Pct;
-
-            let finalHt1 = Math.round((m1Ht1Pct * bttsW1 + m2Ht1Pct * bttsW2) / (bttsW1 + bttsW2));
-            let finalHtX = Math.round((m1HtXPct * bttsW1 + m2HtXPct * bttsW2) / (bttsW1 + bttsW2));
-            let finalHt2 = Math.max(0, 100 - finalHt1 - finalHtX);
-            let finalHtTarafPick = (finalHt1 >= finalHtX && finalHt1 >= finalHt2) ? "İY 1" : ((finalHt2 >= finalHtX && finalHt2 > finalHt1) ? "İY 2" : "İY X");
-            let finalHtTarafConf = Math.max(finalHt1, finalHtX, finalHt2);
-
-            let bttsAgree = (m1BttsPct >= 50 && m2BttsPct >= 50) || (m1BttsPct < 50 && m2BttsPct < 50);
-
-            let tarafKellyHtml = kellyTaraf > 0
-                ? `<b>Kelly Kasa: %${kellyTaraf.toFixed(1)}</b>`
-                : `<span class="pas-text">Kelly Kasa: %0.0 (Pas Geç)</span>`;
-
-            let goalKellyHtml = kellyGoal > 0
-                ? `<b>Kelly Kasa: %${kellyGoal.toFixed(1)}</b>`
-                : `<span class="pas-text">Kelly Kasa: %0.0 (Pas Geç)</span>`;
-
-            let goalBadge = '';
-            if (goalAgree && kellyGoal > 0) {
-                goalBadge = `<span class="seal-badge seal-triple">👑 M1+M2+KELLY ONAMLI</span>`;
-            } else if (goalAgree && kellyGoal <= 0) {
-                goalBadge = `<span class="seal-badge seal-diff">⚠️ M1+M2 UYUMLU (ORAN DEĞERSİZ / PAS)</span>`;
-            } else if (!goalAgree && kellyGoal > 0) {
-                goalBadge = `<span class="seal-badge seal-ok">⚖️ KARMA SENTEZ (SINIRLI +EV)</span>`;
-            } else {
-                goalBadge = `<span class="seal-badge seal-pass">⛔ KARMA SENTEZ (PAS GEÇ)</span>`;
-            }
-
-            let bttsBadge = bttsAgree
-                ? `<span class="seal-badge seal-triple">👑 M1+M2 TAM UYUMLU</span>`
-                : `<span class="seal-badge seal-diff">⚖️ KARMA SENTEZ</span>`;
-
-            let alertHtml = '';
-            if (singleHomeCollapse) {
-                alertHtml += `<div class="def-alert">🚨 <b>SAVUNMA ÇÖKÜŞÜ AVANTAJI:</b> ${homeTeam} savunma hattında ${hInj.defStarterCount} ilk 11 eksiği var ➔ <b>${awayTeam}</b> hücumuna <b>+%${awayBoostPct} xG avantajı</b> işlendi.</div>`;
-            } else if (singleAwayCollapse) {
-                alertHtml += `<div class="def-alert">🚨 <b>SAVUNMA ÇÖKÜŞÜ AVANTAJI:</b> ${awayTeam} savunma hattında ${aInj.defStarterCount} ilk 11 eksiği var ➔ <b>${homeTeam}</b> hücumuna <b>+%${homeBoostPct} xG avantajı</b> işlendi.</div>`;
-            } else if (singleHomeBackbone) {
-                alertHtml += `<div class="backbone-alert">⚡ <b>OMURGA ÇÖKÜŞÜ AVANTAJI:</b> ${homeTeam} kadrosunda ${hInj.starterCount} kritik ilk 11 eksiği var (${awayTeam} kadrosu daha sağlıklı) ➔ <b>${awayTeam}</b> hücumuna <b>+%${awayBoostPct} xG avantajı</b> işlendi.</div>`;
-            } else if (singleAwayBackbone) {
-                alertHtml += `<div class="backbone-alert">⚡ <b>OMURGA ÇÖKÜŞÜ AVANTAJI:</b> ${awayTeam} kadrosunda ${aInj.starterCount} kritik ilk 11 eksiği var (${homeTeam} kadrosu daha sağlıklı) ➔ <b>${homeTeam}</b> hücumuna <b>+%${homeBoostPct} xG avantajı</b> işlendi.</div>`;
-            } else if (bothDefCollapse) {
-                alertHtml += `<div class="caution-alert">⚠️ <b>ÇİFT SAVUNMA ÇÖKÜŞÜ (TEMKİNLİ OYUN FRENİ):</b> Her iki takımda da 2+ savunma eksiği var (${homeTeam}: ${hInj.defStarterCount}, ${awayTeam}: ${aInj.defStarterCount}) ➔ Karşılıklı xG şişirmesi kısıldı ve temkinli oyun katsayısı uygulandı.</div>`;
-            }
-
-            // V36.1: SÜRPRİZ / DEĞER (+EV) RADARI
-            let activeLabels = new Set();
-            if (kellyTaraf > 0) activeLabels.add(m1TarafPick);
-            if (kellyGoal > 0) activeLabels.add(finalGoalPick);
-
-            let radarCandidates = evList
-                .filter(x => x.ev >= 0.05 && !activeLabels.has(x.label))
-                .sort((a, b) => b.ev - a.ev);
-
-            if (radarCandidates.length > 0 && (kellyTaraf === 0 || kellyGoal === 0)) {
-                let topR = radarCandidates[0];
-                let radarKelly = Math.min(2.5, topR.kelly).toFixed(1);
-                alertHtml += `<div class="radar-alert">💎 <b>SÜRPRİZ / DEĞER (+EV) RADARI:</b> Ana tercihler pas geçilirken Motor 4, <b>${topR.label}</b> (Oran: <b>${topR.mktOdd.toFixed(2)}</b> | İhtimal: %${(topR.prob*100).toFixed(1)}) seçeneğinde <b>+%${topR.evPct} +EV</b> tespit etti (Sürpriz Kasa: <b>%${radarKelly}</b>).</div>`;
-            }
-
-            document.getElementById('consensusText').innerHTML = `
-                📌 <b>1. Taraf Mührü:</b> ${m1TarafPick} (Güven: %${m1TarafConf}) ➔ ${tarafKellyHtml}<br>
-                ⚽ <b>2. Gol Mührü:</b> ${finalGoalPick} (Net Güven: %${finalGoalConf}) ➔ ${goalKellyHtml} ${goalBadge}<br>
-                🔥 <b>3. KG Mührü:</b> ${finalBttsPick} (Net Güven: %${finalBttsConf}) ${bttsBadge}<br>
-                ⏱️ <b>4. İlk Yarı Gol Mührü:</b> ${finalHt05Pick} (Net Güven: %${finalHt05Conf})<br>
-                ⏳ <b>5. İlk Yarı Taraf Mührü:</b> ${finalHtTarafPick} (Net Güven: %${finalHtTarafConf})<br>
-                🏆 <b>6. Nihai Skor Çifti:</b> ${scoreMatrix[0].home}-${scoreMatrix[0].away} veya ${scoreMatrix[1].home}-${scoreMatrix[1].away}
-                ${alertHtml}
-            `;
-
-            let trueConfScore = Math.min(96, Math.round((m1TarafConf + finalGoalConf + finalBttsConf) / 3));
-            let totalKellyFooterHtml = totalKellyNum > 0
-                ? `%${totalKelly}`
-                : `<span class="pas-text">%0.0 (PAS GEÇ - DEĞER ORANI YOK)</span>`;
-
-            document.getElementById('sealFooter').innerHTML = `
-                🔒 ÜÇLÜ KANTİTATİF GÜVEN MÜHRÜ: %${trueConfScore}<br>
-                💼 ÖNERİLEN TOPLAM OPTİMAL KASA RİSKİ (KELLY): ${totalKellyFooterHtml}
-            `;
-
-            document.getElementById('loadingText').style.display = 'none';
-            document.getElementById('resultsArea').style.display = 'block';
-        } catch (err) {
-            document.getElementById('loadingText').style.display = 'none';
-            alert("Analiz sırasında hata oluştu: " + err.message);
+
+def normalize_weights(raw_dict: dict) -> dict:
+    keys = list(raw_dict.keys())
+    total_raw = sum(max(0.0, raw_dict[k]) for k in keys)
+    if total_raw <= 0:
+        return {"w1": 35, "w2": 20, "w3": 15, "w4": 10, "w5": 20}
+    res = {}
+    total_int = 0
+    for k in keys:
+        res[k] = round((max(0.0, raw_dict[k]) / total_raw) * 100)
+        total_int += res[k]
+    diff = 100 - total_int
+    if diff != 0:
+        max_key = max(keys, key=lambda k: res[k])
+        res[max_key] += diff
+    return res
+
+
+def fetch_injuries_via_gemini(api_key: str, match_name: str):
+    prompt = (
+        f"{match_name} futbol maçı için her iki takımın bugünkü güncel sakat ve cezalı İLK 11 oyuncularını "
+        "internetten araştır. Uzun süreli veya yedek oyuncuları yazma. Stoper, bek, kaleci ve kilit oyun kurucu "
+        "mevkilerini ayrı ve net belirt. Eğer yerine ilk 11'de geçecek yedek oyuncunun güncel SofaScore/WhoScored "
+        "sezon puanını gerçek kaynakta bulabiliyorsan ve 6.50 altındaysa oyuncunun yanına puanı ekle "
+        "(örn: Lacroix stoper 6.3); gerçek puan bulamazsan kesinlikle tahmin etme ve sayı yazma. "
+        "Sadece şu 2 satır formatında kısa cevap ver:\n"
+        "EV: [eksik oyuncular ve mevkileri, yoksa Yok]\n"
+        "DEP: [eksik oyuncular ve mevkileri, yoksa Yok]"
+    )
+
+    def call_model(model_name: str, use_search: bool):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key.strip()}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        if use_search:
+            payload["tools"] = [{"google_search": {}}]
+        return requests.post(url, json=payload, timeout=25)
+
+    candidates = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.0-flash"]
+    tried = []
+    resp = None
+    used_model = ""
+
+    for m in candidates:
+        tried.append(m)
+        resp = call_model(m, True)
+        if resp.status_code == 400:
+            resp = call_model(m, False)
+        if resp.ok:
+            used_model = m
+            break
+        if resp.status_code != 404:
+            break
+
+    if resp is None or resp.status_code == 404:
+        list_resp = requests.get(
+            f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key.strip()}",
+            timeout=15,
+        )
+        if list_resp.ok:
+            models = list_resp.json().get("models", [])
+            valid = [
+                m["name"].replace("models/", "")
+                for m in models
+                if "generateContent" in m.get("supportedGenerationMethods", [])
+                and m["name"].replace("models/", "") not in tried
+            ]
+            detected = next((n for n in valid if "flash" in n), valid[0] if valid else None)
+            if detected:
+                used_model = detected
+                resp = call_model(detected, True)
+                if resp.status_code == 400:
+                    resp = call_model(detected, False)
+
+    if resp is None or not resp.ok:
+        code = resp.status_code if resp is not None else "Bağlantı"
+        raise RuntimeError(f"API Hatası (HTTP {code})")
+
+    data = resp.json()
+    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    text = "\n".join(p.get("text", "") for p in parts)
+
+    ev_match = re.search(r"EV:\s*(.+)", text, re.IGNORECASE)
+    dep_match = re.search(r"DEP:\s*(.+)", text, re.IGNORECASE)
+    ev_txt = ev_match.group(1).replace("*", "").strip() if ev_match else ""
+    dep_txt = dep_match.group(1).replace("*", "").strip() if dep_match else ""
+
+    if ev_txt.lower() == "yok":
+        ev_txt = ""
+    if dep_txt.lower() == "yok":
+        dep_txt = ""
+
+    return ev_txt, dep_txt, used_model
+
+
+st.markdown(
+    """
+    <div class="z-header">
+        <h1>ZAFEROPTA QUANT PRO</h1>
+        <p>V36.1 // Omurga Çöküşü + Kilit Oyun Kurucu + +EV Radarı (Python)</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+if "home_inj_val" not in st.session_state:
+    st.session_state["home_inj_val"] = ""
+if "away_inj_val" not in st.session_state:
+    st.session_state["away_inj_val"] = ""
+
+uploaded_file = st.file_uploader("1. 75 SÜTUNLU ARŞİV EXCEL (.XLSX)", type=["xlsx", "xls"])
+df_archive = None
+col_map = None
+
+if uploaded_file is not None:
+    df_archive, col_map = load_excel_archive(uploaded_file.getvalue())
+    if df_archive is not None:
+        ms_lbl = col_map["ms_score"] or (
+            f"{col_map['home_goal']}/{col_map['away_goal']}" if col_map["home_goal"] else "YOK"
+        )
+        st.success(
+            f"✔ {len(df_archive)} satırlık arşiv yüklendi | "
+            f"Ev: [{col_map['home'] or 'YOK'}] | Dep: [{col_map['away'] or 'YOK'}] | "
+            f"MS: [{ms_lbl}] | İY: [{col_map['ht_score'] or 'YOK'}]"
+        )
+    else:
+        st.error("Excel başlık satırı algılanamadı.")
+
+match_input = st.text_input("2. MAÇ ANALİZİ (EV SAHİBİ - DEPLASMAN)", placeholder="Örn: Galatasaray - Aston Villa")
+
+with st.expander("🤖 CANLI SAKAT & CEZALI TARAMA (GEMINI API)", expanded=False):
+    api_key_input = st.text_input("Google AI Studio API Anahtarı", type="password")
+    if st.button("🔍 SAKAT / CEZALILARI İNTERNETTEN TARA", use_container_width=True):
+        if not api_key_input.strip():
+            st.warning("Önce API anahtarını girin.")
+        elif "-" not in match_input:
+            st.warning("Maç adını 'Ev Sahibi - Deplasman' formatında yazın.")
+        else:
+            try:
+                with st.spinner("İlk 11 sakat/cezalıları taranıyor..."):
+                    ev_res, dep_res, model_used = fetch_injuries_via_gemini(api_key_input, match_input)
+                    st.session_state["home_inj_val"] = ev_res
+                    st.session_state["away_inj_val"] = dep_res
+                    st.success(f"✔ Tarama tamamlandı ({model_used}) ve kutulara işlendi.")
+            except Exception as exc:
+                st.error(f"❌ {exc}")
+
+home_injuries = st.text_input(
+    "3. EV SAHİBİ SAKAT / CEZALI OYUNCULAR",
+    key="home_inj_val",
+    placeholder="Örn: Victor Osimhen kilit forvet, Rafael Leao kilit kanat, Ismail Jakobs bek",
+)
+away_injuries = st.text_input(
+    "4. DEPLASMAN SAKAT / CEZALI OYUNCULAR",
+    key="away_inj_val",
+    placeholder="Örn: Matty Cash bek, Matteo Ruggeri bek",
+)
+
+st.markdown("**5. GOALOO XG & XGA MANUEL GİRİŞİ (OPSİYONEL)**")
+c_g1, c_g2 = st.columns(2)
+with c_g1:
+    g_home_xg = st.number_input("Ev Attack xG", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
+    g_away_xg = st.number_input("Dep Attack xG", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
+with c_g2:
+    g_home_xga = st.number_input("Ev Defence xGA", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
+    g_away_xga = st.number_input("Dep Defence xGA", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
+
+st.markdown("**6. GÜNCEL PİYASA ORANLARI & GOL BAREMİ (+EV & KELLY)**")
+c_o1, c_o2, c_o3 = st.columns(3)
+with c_o1:
+    odd_ms1 = st.number_input("MS 1", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
+with c_o2:
+    odd_ms0 = st.number_input("MS 0", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
+with c_o3:
+    odd_ms2 = st.number_input("MS 2", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
+
+c_b1, c_b2, c_b3 = st.columns(3)
+with c_b1:
+    goal_line = st.selectbox("Gol Baremi", [1.5, 2.5, 3.5, 4.5], index=1)
+with c_b2:
+    odd_over = st.number_input(f"{goal_line:.1f} ÜST", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
+with c_b3:
+    odd_under = st.number_input(f"{goal_line:.1f} ALT", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
+
+if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_container_width=True):
+    if "-" not in match_input:
+        st.error("Lütfen maç adını araya tire (-) koyarak girin! (Örn: Galatasaray - Aston Villa)")
+        st.stop()
+
+    has_goaloo = (g_home_xg > 0 and g_home_xga > 0 and g_away_xg > 0 and g_away_xga > 0)
+    if (df_archive is None or df_archive.empty) and not has_goaloo:
+        st.error("Lütfen 1. bölümden Excel arşivini yükleyin VEYA 5. bölümden Goaloo xG/xGA değerlerini girin!")
+        st.stop()
+
+    parts = match_input.split("-", 1)
+    home_team = parts[0].strip()
+    away_team = parts[1].strip()
+    gl_str = f"{goal_line:.1f}"
+
+    home_indices, home_label, h_strict, h_qnorm, h_qcore = find_team_rows(df_archive, col_map, home_team)
+    away_indices, away_label, a_strict, a_qnorm, a_qcore = find_team_rows(df_archive, col_map, away_team)
+
+    combined_indices = list(dict.fromkeys(home_indices + away_indices))
+    home_stats = calc_team_stats(df_archive, col_map, home_indices, h_strict, h_qnorm, h_qcore)
+    away_stats = calc_team_stats(df_archive, col_map, away_indices, a_strict, a_qnorm, a_qcore)
+
+    if not home_stats and not away_stats and not has_goaloo:
+        st.warning(f"'{home_team}' ve '{away_team}' Excel arşivinde bulunamadı ve Goaloo xG girilmedi.")
+        st.stop()
+
+    h_inj = analyze_injury_text(home_injuries)
+    a_inj = analyze_injury_text(away_injuries)
+
+    h_excel_att = (home_stats["home_avg_scored"] * 0.65 + home_stats["avg_scored"] * 0.35) if home_stats else None
+    h_excel_def = (home_stats["home_avg_conceded"] * 0.65 + home_stats["avg_conceded"] * 0.35) if home_stats else None
+    a_excel_att = (away_stats["away_avg_scored"] * 0.65 + away_stats["avg_scored"] * 0.35) if away_stats else None
+    a_excel_def = (away_stats["away_avg_conceded"] * 0.65 + away_stats["avg_conceded"] * 0.35) if away_stats else None
+
+    excel_home_xg = ((h_excel_att + a_excel_def) / 2.0) * 1.06 if (h_excel_att is not None and a_excel_def is not None) else h_excel_att
+    excel_away_xg = ((a_excel_att + h_excel_def) / 2.0) * 0.94 if (a_excel_att is not None and h_excel_def is not None) else a_excel_att
+
+    goaloo_home_xg = (g_home_xg + g_away_xga) / 2.0 if has_goaloo else None
+    goaloo_away_xg = (g_away_xg + g_home_xga) / 2.0 if has_goaloo else None
+
+    if excel_home_xg is not None and goaloo_home_xg is not None:
+        base_home_xg = (excel_home_xg * 0.5) + (goaloo_home_xg * 0.5)
+        base_away_xg = (excel_away_xg * 0.5) + (goaloo_away_xg * 0.5)
+    elif goaloo_home_xg is not None:
+        base_home_xg = goaloo_home_xg
+        base_away_xg = goaloo_away_xg
+    else:
+        base_home_xg = excel_home_xg if excel_home_xg is not None else 1.35
+        base_away_xg = excel_away_xg if excel_away_xg is not None else 1.05
+
+    h_net_missing = h_inj["starter_count"] - a_inj["starter_count"]
+    a_net_missing = a_inj["starter_count"] - h_inj["starter_count"]
+
+    h_backbone_collapse = (not h_inj["def_collapse"]) and (
+        (h_inj["def_starter_count"] >= 1 and h_inj["gk_starter_count"] >= 1 and h_net_missing >= 1)
+        or (h_inj["starter_count"] >= 3 and h_net_missing >= 2)
+    )
+    a_backbone_collapse = (not a_inj["def_collapse"]) and (
+        (a_inj["def_starter_count"] >= 1 and a_inj["gk_starter_count"] >= 1 and a_net_missing >= 1)
+        or (a_inj["starter_count"] >= 3 and a_net_missing >= 2)
+    )
+
+    single_home_collapse = h_inj["def_collapse"] and not a_inj["def_collapse"]
+    single_away_collapse = a_inj["def_collapse"] and not h_inj["def_collapse"]
+    both_def_collapse = h_inj["def_collapse"] and a_inj["def_collapse"]
+
+    single_home_backbone = h_backbone_collapse and not a_inj["def_collapse"] and not a_backbone_collapse
+    single_away_backbone = a_backbone_collapse and not h_inj["def_collapse"] and not h_backbone_collapse
+
+    home_def_adv_rate = 0.65 if single_away_collapse else (0.55 if single_away_backbone else (0.25 if both_def_collapse else 0.32))
+    away_def_adv_rate = 0.65 if single_home_collapse else (0.55 if single_home_backbone else (0.25 if both_def_collapse else 0.32))
+    caution_factor = 0.94 if both_def_collapse else 1.0
+
+    home_gap_boost = (1.0 + min(0.12, (a_net_missing - 1) * 0.05)) if (not both_def_collapse and a_net_missing >= 2) else 1.0
+    away_gap_boost = (1.0 + min(0.12, (h_net_missing - 1) * 0.05)) if (not both_def_collapse and h_net_missing >= 2) else 1.0
+    home_gap_drag = (1.0 - min(0.10, (h_net_missing - 1) * 0.04)) if (not both_def_collapse and h_net_missing >= 2) else 1.0
+    away_gap_drag = (1.0 - min(0.10, (a_net_missing - 1) * 0.04)) if (not both_def_collapse and a_net_missing >= 2) else 1.0
+
+    home_att_health = max(0.70, 1.0 - h_inj["att_pen"])
+    away_att_health = max(0.70, 1.0 - a_inj["att_pen"])
+
+    home_boost_mult = (1.0 + ((a_inj["def_pen"] * home_def_adv_rate) + a_inj["gk_pen"]) * home_att_health) * home_gap_boost
+    away_boost_mult = (1.0 + ((h_inj["def_pen"] * away_def_adv_rate) + h_inj["gk_pen"]) * away_att_health) * away_gap_boost
+
+    home_boost_pct = round((home_boost_mult * caution_factor - 1.0) * 100)
+    away_boost_pct = round((away_boost_mult * caution_factor - 1.0) * 100)
+
+    base_home_xg = max(0.30, base_home_xg * (1.0 - h_inj["att_pen"]) * home_gap_drag * home_boost_mult * caution_factor)
+    base_away_xg = max(0.25, base_away_xg * (1.0 - a_inj["att_pen"]) * away_gap_drag * away_boost_mult * caution_factor)
+
+    rho = -0.13
+    score_matrix = []
+    total_prob = 0.0
+    for h in range(9):
+        for a in range(9):
+            tau = dixon_coles_tau(h, a, base_home_xg, base_away_xg, rho)
+            p = poisson_prob(base_home_xg, h) * poisson_prob(base_away_xg, a) * tau
+            score_matrix.append({"home": h, "away": a, "prob": p})
+            total_prob += p
+
+    p_home_win = p_draw = p_away_win = m1_btts_prob = 0.0
+    m1_over15 = m1_over25 = m1_over35 = m1_over45 = m1_sel_over = 0.0
+
+    for item in score_matrix:
+        item["prob"] /= total_prob
+        tot = item["home"] + item["away"]
+        if item["home"] > item["away"]:
+            p_home_win += item["prob"]
+        elif item["home"] == item["away"]:
+            p_draw += item["prob"]
+        else:
+            p_away_win += item["prob"]
+        if tot > 1.5:
+            m1_over15 += item["prob"]
+        if tot > 2.5:
+            m1_over25 += item["prob"]
+        if tot > 3.5:
+            m1_over35 += item["prob"]
+        if tot > 4.5:
+            m1_over45 += item["prob"]
+        if tot > goal_line:
+            m1_sel_over += item["prob"]
+        if item["home"] > 0 and item["away"] > 0:
+            m1_btts_prob += item["prob"]
+
+    score_matrix.sort(key=lambda x: x["prob"], reverse=True)
+    m1_sel_under = max(0.0, 1.0 - m1_sel_over)
+    m1_sel_over_pct = round(m1_sel_over * 100)
+    m1_over25_pct = round(m1_over25 * 100)
+    m1_over35_pct = round(m1_over35 * 100)
+    m1_over45_pct = round(m1_over45 * 100)
+
+    ht_home_xg = base_home_xg * 0.44
+    ht_away_xg = base_away_xg * 0.44
+    p_ht1 = p_htx = p_ht2 = p_ht_over05 = ht_tot_prob = 0.0
+    for h in range(6):
+        for a in range(6):
+            tau_ht = dixon_coles_tau(h, a, ht_home_xg, ht_away_xg, -0.10)
+            p = poisson_prob(ht_home_xg, h) * poisson_prob(ht_away_xg, a) * tau_ht
+            ht_tot_prob += p
+            if h > a:
+                p_ht1 += p
+            elif h == a:
+                p_htx += p
+            else:
+                p_ht2 += p
+            if (h + a) > 0.5:
+                p_ht_over05 += p
+
+    m1_ht1_pct = round((p_ht1 / ht_tot_prob) * 100)
+    m1_htx_pct = round((p_htx / ht_tot_prob) * 100)
+    m1_ht2_pct = max(0, 100 - m1_ht1_pct - m1_htx_pct)
+    m1_ht05_pct = round((p_ht_over05 / ht_tot_prob) * 100)
+    m1_ht_taraf = "İY 1" if (m1_ht1_pct >= m1_htx_pct and m1_ht1_pct >= m1_ht2_pct) else (
+        "İY 2" if (m1_ht2_pct >= m1_htx_pct and m1_ht2_pct > m1_ht1_pct) else "İY X"
+    )
+
+    m1_btts_pct = round(m1_btts_prob * 100)
+    m1_taraf_pick = "MS 1" if (p_home_win >= p_away_win and p_home_win >= p_draw) else (
+        "MS 2" if (p_away_win > p_home_win and p_away_win >= p_draw) else "MS 0"
+    )
+    m1_taraf_prob = max(p_home_win, p_draw, p_away_win)
+    m1_taraf_conf = round(m1_taraf_prob * 100)
+
+    over_sel_cnt = over25_cnt = over35_cnt = over45_cnt = btts_cnt = valid_rows = 0
+    ht05_cnt = ht1_cnt = htx_cnt = ht2_cnt = valid_ht_rows = 0
+
+    for idx in combined_indices:
+        row = df_archive.loc[idx]
+        sc = get_row_ms_score(row, col_map)
+        if sc is not None:
+            valid_rows += 1
+            tot = sc[0] + sc[1]
+            if tot > goal_line:
+                over_sel_cnt += 1
+            if tot > 2.5:
+                over25_cnt += 1
+            if tot > 3.5:
+                over35_cnt += 1
+            if tot > 4.5:
+                over45_cnt += 1
+            if sc[0] > 0 and sc[1] > 0:
+                btts_cnt += 1
+        sc_iy = get_row_ht_score(row, col_map)
+        if sc_iy is not None:
+            valid_ht_rows += 1
+            if (sc_iy[0] + sc_iy[1]) > 0.5:
+                ht05_cnt += 1
+            if sc_iy[0] > sc_iy[1]:
+                ht1_cnt += 1
+            elif sc_iy[0] == sc_iy[1]:
+                htx_cnt += 1
+            else:
+                ht2_cnt += 1
+
+    m2_has_data = valid_rows > 0
+    m2_sel_over_pct = round((over_sel_cnt / valid_rows) * 100) if m2_has_data else m1_sel_over_pct
+    m2_over25_pct = round((over25_cnt / valid_rows) * 100) if m2_has_data else m1_over25_pct
+    m2_over35_pct = round((over35_cnt / valid_rows) * 100) if m2_has_data else m1_over35_pct
+    m2_over45_pct = round((over45_cnt / valid_rows) * 100) if m2_has_data else m1_over45_pct
+    m2_btts_pct = round((btts_cnt / valid_rows) * 100) if m2_has_data else m1_btts_pct
+    m2_ht05_pct = round((ht05_cnt / valid_ht_rows) * 100) if valid_ht_rows > 0 else m1_ht05_pct
+    m2_ht1_pct = round((ht1_cnt / valid_ht_rows) * 100) if valid_ht_rows > 0 else m1_ht1_pct
+    m2_htx_pct = round((htx_cnt / valid_ht_rows) * 100) if valid_ht_rows > 0 else m1_htx_pct
+    m2_ht2_pct = max(0, 100 - m2_ht1_pct - m2_htx_pct) if valid_ht_rows > 0 else m1_ht2_pct
+    m2_ht_taraf = "İY 1" if (m2_ht1_pct >= m2_htx_pct and m2_ht1_pct >= m2_ht2_pct) else (
+        "İY 2" if (m2_ht2_pct >= m2_htx_pct and m2_ht2_pct > m2_ht1_pct) else "İY X"
+    )
+
+    KELLY_CAP = 5.0
+
+    def check_ev(label: str, prob: float, mkt_odd: float):
+        if mkt_odd <= 1.01:
+            return None
+        ev = (prob * mkt_odd) - 1.0
+        ev_pct = f"{ev * 100:.1f}"
+        raw_kelly = (((mkt_odd - 1.0) * prob - (1.0 - prob)) / (mkt_odd - 1.0)) * 0.25 * 100.0 if ev > 0 else 0.0
+        raw_kelly = max(0.0, raw_kelly)
+        return {
+            "label": label,
+            "prob": prob,
+            "mkt_odd": mkt_odd,
+            "ev": ev,
+            "ev_pct": ev_pct,
+            "raw_kelly": raw_kelly,
+            "kelly": min(KELLY_CAP, raw_kelly),
+            "is_capped": raw_kelly > KELLY_CAP,
         }
-    }, 300);
-}
-</script>
 
-</body>
-</html>
+    ev1 = check_ev("MS 1", p_home_win, odd_ms1)
+    ev0 = check_ev("MS 0", p_draw, odd_ms0)
+    ev2 = check_ev("MS 2", p_away_win, odd_ms2)
+    ev_over = check_ev(f"{gl_str} ÜST", m1_sel_over, odd_over)
+    ev_under = check_ev(f"{gl_str} ALT", m1_sel_under, odd_under)
+    ev_list = [x for x in (ev1, ev0, ev2, ev_over, ev_under) if x is not None]
+
+    p_ah_hm05 = sum(s["prob"] for s in score_matrix if (s["home"] - s["away"]) >= 1)
+    p_ah_am05 = sum(s["prob"] for s in score_matrix if (s["home"] - s["away"]) <= -1)
+    p_ah_ap05 = sum(s["prob"] for s in score_matrix if (s["home"] - s["away"]) <= 0)
+
+    if p_ah_hm05 >= 0.55:
+        best_ah_prob = p_ah_hm05
+        best_ah = f"{home_team} -0.5 AH (%{round(p_ah_hm05 * 100)})"
+    elif p_ah_am05 >= 0.52:
+        best_ah_prob = p_ah_am05
+        best_ah = f"{away_team} -0.5 AH (%{round(p_ah_am05 * 100)})"
+    else:
+        best_ah_prob = p_ah_ap05
+        best_ah = f"{away_team} +0.5 AH (%{round(p_ah_ap05 * 100)})"
+
+    h_xg_val = g_home_xg if has_goaloo else (home_stats["avg_scored"] if home_stats else 1.40)
+    h_xga_val = g_home_xga if has_goaloo else (home_stats["avg_conceded"] if home_stats else 1.15)
+    a_xg_val = g_away_xg if has_goaloo else (away_stats["avg_scored"] if away_stats else 1.20)
+    a_xga_val = g_away_xga if has_goaloo else (away_stats["avg_conceded"] if away_stats else 1.25)
+
+    raw_ev_gol = (h_xg_val + a_xga_val) / 2.0
+    raw_dep_gol = (a_xg_val + h_xga_val) / 2.0
+    adj_ev_gol = max(0.30, raw_ev_gol * (1.0 - h_inj["att_pen"] * 0.85) * home_gap_drag * home_boost_mult * caution_factor)
+    adj_dep_gol = max(0.25, raw_dep_gol * (1.0 - a_inj["att_pen"] * 0.85) * away_gap_drag * away_boost_mult * caution_factor)
+    beklenen_gol = adj_ev_gol + adj_dep_gol
+    raw_beklenen_gol = raw_ev_gol + raw_dep_gol
+
+    f_state_h = home_stats["ewma_form"] if home_stats else min(95, max(30, round(50 + (h_xg_val - h_xga_val) * 20)))
+    f_attack_h = min(98, max(20, round((45 + h_xg_val * 24) * (1.0 - h_inj["att_pen"] * 0.5) * home_gap_drag * min(1.20, home_boost_mult * caution_factor))))
+    f_def_h = min(98, max(12, round((92 - h_xga_val * 26) * (1.0 - (h_inj["def_pen"] * 0.85 + h_inj["gk_pen"] * 0.5)))))
+
+    f_state_a = away_stats["ewma_form"] if away_stats else min(95, max(30, round(50 + (a_xg_val - a_xga_val) * 20)))
+    f_attack_a = min(98, max(20, round((45 + a_xg_val * 24) * (1.0 - a_inj["att_pen"] * 0.5) * away_gap_drag * min(1.20, away_boost_mult * caution_factor))))
+    f_def_a = min(98, max(12, round((92 - a_xga_val * 26) * (1.0 - (a_inj["def_pen"] * 0.85 + a_inj["gk_pen"] * 0.5)))))
+
+    h_power = f_state_h * 0.40 + f_attack_h * 0.30 + f_def_h * 0.30
+    a_power = f_state_a * 0.40 + f_attack_a * 0.30 + f_def_a * 0.30
+    m12_taraf = "MS 1" if h_power > a_power + 6 else ("MS 2" if a_power > h_power + 6 else "MS 0 (Beraberlik)")
+
+    m5_sel_over_pct = round(poisson_over_total_prob(beklenen_gol, goal_line) * 100)
+    m12_goal_res = f"{gl_str} ÜST" if m5_sel_over_pct >= 50 else f"{gl_str} ALT"
+    m12_btts_res = "KG VAR" if (adj_ev_gol >= 0.95 and adj_dep_gol >= 0.85) else "KG YOK"
+
+    form_gap = abs(f_state_h - f_state_a)
+    def_inj_imp = (h_inj["def_starter_count"] + a_inj["def_starter_count"]) * 4.5 + (5 if h_inj["def_collapse"] else 0) + (5 if a_inj["def_collapse"] else 0)
+    bb_imp = (6 if h_backbone_collapse else 0) + (6 if a_backbone_collapse else 0)
+    gk_imp = (h_inj["gk_starter_count"] + a_inj["gk_starter_count"]) * 1.5
+    other_imp = (h_inj["att_mid_starter_count"] + a_inj["att_mid_starter_count"]) * 1.2
+
+    raw_w1 = (38 if not m2_has_data else 30) + (8 if not has_goaloo else 0)
+    raw_w2 = 0 if valid_rows == 0 else (12 if valid_rows < 10 else (19 if valid_rows < 20 else (27 if valid_rows >= 35 else 23)))
+    raw_w3 = 10 + min(20, def_inj_imp + bb_imp + gk_imp + other_imp) + (4 if form_gap >= 25 else (2 if form_gap >= 15 else 0))
+    raw_w4 = 12 if (len(ev_list) > 0 or best_ah_prob >= 0.62) else 9
+    raw_w5 = 5 if not has_goaloo else (24 if valid_rows < 10 else 20)
+
+    dyn_w = normalize_weights({"w1": raw_w1, "w2": raw_w2, "w3": raw_w3, "w4": raw_w4, "w5": raw_w5})
+
+    m3_goal_sig = m1_sel_over_pct
+    if single_home_collapse or single_away_collapse:
+        m3_goal_sig = min(90, m1_sel_over_pct + 8)
+    elif single_home_backbone or single_away_backbone:
+        m3_goal_sig = min(88, m1_sel_over_pct + 5)
+    elif both_def_collapse:
+        m3_goal_sig = max(20, m1_sel_over_pct - 4)
+
+    final_sel_over_pct = round(
+        (
+            dyn_w["w1"] * m1_sel_over_pct
+            + dyn_w["w2"] * m2_sel_over_pct
+            + dyn_w["w3"] * m3_goal_sig
+            + dyn_w["w4"] * m1_sel_over_pct
+            + dyn_w["w5"] * m5_sel_over_pct
+        )
+        / 100.0
+    )
+    final_goal_pick = f"{gl_str} ÜST" if final_sel_over_pct >= 50 else f"{gl_str} ALT"
+    final_goal_conf = final_sel_over_pct if final_sel_over_pct >= 50 else (100 - final_sel_over_pct)
+    goal_agree = (m1_sel_over_pct >= 50 and m2_sel_over_pct >= 50) or (m1_sel_over_pct < 50 and m2_sel_over_pct < 50)
+
+    picked_taraf_ev = ev1 if m1_taraf_pick == "MS 1" else (ev2 if m1_taraf_pick == "MS 2" else ev0)
+    if picked_taraf_ev:
+        kelly_taraf = picked_taraf_ev["kelly"]
+    else:
+        kelly_taraf = min(KELLY_CAP, (m1_taraf_conf - 48) * 0.18) if m1_taraf_conf > 52 else 0.0
+
+    goal_pick_is_over = final_goal_pick == f"{gl_str} ÜST"
+    target_goal_ev = ev_over if goal_pick_is_over else ev_under
+
+    if final_goal_conf < 55:
+        goal_kelly_cap = 0.0
+    elif final_goal_conf < 60 or not goal_agree:
+        goal_kelly_cap = 1.5
+    else:
+        goal_kelly_cap = KELLY_CAP
+
+    if target_goal_ev:
+        kelly_goal = min(goal_kelly_cap, target_goal_ev["raw_kelly"])
+    elif not ev_over and not ev_under:
+        raw_g = min(4.5, (final_goal_conf - 50) * 0.18) if final_goal_conf >= 55 else 0.0
+        kelly_goal = min(goal_kelly_cap, raw_g)
+    else:
+        kelly_goal = 0.0
+
+    total_kelly = kelly_taraf + kelly_goal
+
+    btts_w1 = (dyn_w["w1"] + dyn_w["w3"] + dyn_w["w5"]) if m2_has_data else 100
+    btts_w2 = (dyn_w["w2"] + dyn_w["w4"]) if m2_has_data else 0
+    final_btts_pct = round((m1_btts_pct * btts_w1 + m2_btts_pct * btts_w2) / (btts_w1 + btts_w2))
+    final_btts_pick = "KG VAR" if final_btts_pct >= 50 else "KG YOK"
+    final_btts_conf = final_btts_pct if final_btts_pct >= 50 else (100 - final_btts_pct)
+    btts_agree = (m1_btts_pct >= 50 and m2_btts_pct >= 50) or (m1_btts_pct < 50 and m2_btts_pct < 50)
+
+    final_ht05_pct = round((m1_ht05_pct * btts_w1 + m2_ht05_pct * btts_w2) / (btts_w1 + btts_w2))
+    final_ht05_pick = "İY 0.5 ÜST" if final_ht05_pct >= 50 else "İY 0.5 ALT"
+    final_ht05_conf = final_ht05_pct if final_ht05_pct >= 50 else (100 - final_ht05_pct)
+
+    final_ht1 = round((m1_ht1_pct * btts_w1 + m2_ht1_pct * btts_w2) / (btts_w1 + btts_w2))
+    final_htx = round((m1_htx_pct * btts_w1 + m2_htx_pct * btts_w2) / (btts_w1 + btts_w2))
+    final_ht2 = max(0, 100 - final_ht1 - final_htx)
+    final_ht_pick = "İY 1" if (final_ht1 >= final_htx and final_ht1 >= final_ht2) else (
+        "İY 2" if (final_ht2 >= final_htx and final_ht2 > final_ht1) else "İY X"
+    )
+    final_ht_conf = max(final_ht1, final_htx, final_ht2)
+
+    top_scores_html = "".join(
+        f'<div class="score-item"><div class="sc">{s["home"]}-{s["away"]}</div><div class="pr">%{s["prob"]*100:.1f}</div></div>'
+        for s in score_matrix[:6]
+    )
+    st.markdown(
+        f"""
+        <div class="engine-card" style="border-left-color:#00f3ff;">
+            <h4>Motor 1: Dixon-Coles (ρ=-0.13), xG & Pazarlar</h4>
+            Ev: <b>{base_home_xg:.2f}</b> | Dep: <b>{base_away_xg:.2f}</b> (Toplam: <b>{base_home_xg + base_away_xg:.2f}</b>)
+            <div class="score-grid">{top_scores_html}</div>
+            <div style="margin-top:8px;">
+                🎯 <b>Taraf:</b> {m1_taraf_pick} (MS1:%{round(p_home_win*100)} | MS0:%{round(p_draw*100)} | MS2:%{round(p_away_win*100)})<br>
+                • <b>Barem ({gl_str}):</b> {"ÜST" if m1_sel_over_pct >= 50 else "ALT"} (%{m1_sel_over_pct if m1_sel_over_pct >= 50 else 100-m1_sel_over_pct}) |
+                <b>2.5Ü:</b> %{m1_over25_pct} | <b>3.5Ü:</b> %{m1_over35_pct} | <b>KG:</b> {"VAR" if m1_btts_pct >= 50 else "YOK"} (%{m1_btts_pct if m1_btts_pct >= 50 else 100-m1_btts_pct})
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="engine-card" style="border-left-color:#00ff66;">
+            <h4>Motor 2: Excel Arşiv & İç/Dış Saha Sonuçları</h4>
+            <b>{home_label or home_team}</b> ({len(home_indices)} maç) & <b>{away_label or away_team}</b> ({len(away_indices)} maç) ➔ <b>{valid_rows}</b> gerçek MS skoru<br>
+            • <b>{gl_str} Üst:</b> %{m2_sel_over_pct} | <b>2.5 Üst:</b> %{m2_over25_pct} | <b>KG Var:</b> %{m2_btts_pct} | <b>İY 0.5 Üst:</b> %{m2_ht05_pct}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    fair_ms1 = f"{1.0 / max(0.02, p_home_win):.2f}"
+    fair_ms0 = f"{1.0 / max(0.02, p_draw):.2f}"
+    fair_ms2 = f"{1.0 / max(0.02, p_away_win):.2f}"
+    fair_over = f"{1.0 / max(0.02, m1_sel_over):.2f}"
+    fair_under = f"{1.0 / max(0.02, m1_sel_under):.2f}"
+
+    ev_lines_html = "".join(
+        f"• <b>{x['label']}</b> (Oran: {x['mkt_odd']:.2f} | İhtimal: %{x['prob']*100:.1f}): "
+        f"<span style='color:{'#00ff66' if x['ev'] > 0 else '#ff3366'}; font-weight:bold;'>"
+        f"{'+' if x['ev'] > 0 else ''}%{x['ev_pct']} {'✅ +EV' if x['ev'] > 0 else '❌ -EV'}</span><br>"
+        for x in ev_list
+    ) or "Oran girilmediği için +EV taraması pasif."
+
+    st.markdown(
+        f"""
+        <div class="engine-card" style="border-left-color:#ff9900;">
+            <h4>Motor 3 & 4: Adil Oranlar & +EV Değer Tespiti</h4>
+            <b>Adil Oranlar:</b> MS1: <b>{fair_ms1}</b> | MS0: <b>{fair_ms0}</b> | MS2: <b>{fair_ms2}</b> | {gl_str} Üst: <b>{fair_over}</b> | {gl_str} Alt: <b>{fair_under}</b><br>
+            {ev_lines_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="engine-card" style="border-left-color:#a855f7;">
+            <h4>Motor 5, 6, 7, 8, 9 & 12: Kadro, Handikap & Goaloo Özeti</h4>
+            🏥 <b>{home_team}:</b> {h_inj['note']} | EWMA: %{f_state_h}<br>
+            🏥 <b>{away_team}:</b> {a_inj['note']} | EWMA: %{f_state_a}<br>
+            ⚖️ <b>Asya Handikap:</b> {best_ah} | <b>Goaloo Düzeltilmiş Gol:</b> {beklenen_gol:.2f} (Ham: {raw_beklenen_gol:.2f}) | <b>M12:</b> {m12_taraf} / {m12_goal_res} / {m12_btts_res}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if goal_agree and kelly_goal > 0:
+        goal_badge = '<span class="seal-badge seal-triple">👑 M1+M2+KELLY ONAMLI</span>'
+    elif goal_agree and kelly_goal <= 0:
+        goal_badge = '<span class="seal-badge seal-diff">⚠️ M1+M2 UYUMLU (PAS)</span>'
+    elif (not goal_agree) and kelly_goal > 0:
+        goal_badge = '<span class="seal-badge seal-ok">⚖️ KARMA SENTEZ (SINIRLI +EV)</span>'
+    else:
+        goal_badge = '<span class="seal-badge seal-pass">⛔ KARMA SENTEZ (PAS GEÇ)</span>'
+
+    btts_badge = (
+        '<span class="seal-badge seal-triple">👑 M1+M2 TAM UYUMLU</span>'
+        if btts_agree
+        else '<span class="seal-badge seal-diff">⚖️ KARMA SENTEZ</span>'
+    )
+
+    alert_blocks = ""
+    if single_home_collapse:
+        alert_blocks += f'<div class="alert-def">🚨 <b>SAVUNMA ÇÖKÜŞÜ AVANTAJI:</b> {home_team} savunmasında {h_inj["def_starter_count"]} ilk 11 eksiği var ➔ <b>{away_team}</b> hücumuna <b>+%{away_boost_pct} xG avantajı</b> işlendi.</div>'
+    elif single_away_collapse:
+        alert_blocks += f'<div class="alert-def">🚨 <b>SAVUNMA ÇÖKÜŞÜ AVANTAJI:</b> {away_team} savunmasında {a_inj["def_starter_count"]} ilk 11 eksiği var ➔ <b>{home_team}</b> hücumuna <b>+%{home_boost_pct} xG avantajı</b> işlendi.</div>'
+    elif single_home_backbone:
+        alert_blocks += f'<div class="alert-backbone">⚡ <b>OMURGA ÇÖKÜŞÜ AVANTAJI:</b> {home_team} kadrosunda {h_inj["starter_count"]} kritik ilk 11 eksiği var ➔ <b>{away_team}</b> hücumuna <b>+%{away_boost_pct} xG avantajı</b> işlendi.</div>'
+    elif single_away_backbone:
+        alert_blocks += f'<div class="alert-backbone">⚡ <b>OMURGA ÇÖKÜŞÜ AVANTAJI:</b> {away_team} kadrosunda {a_inj["starter_count"]} kritik ilk 11 eksiği var ➔ <b>{home_team}</b> hücumuna <b>+%{home_boost_pct} xG avantajı</b> işlendi.</div>'
+    elif both_def_collapse:
+        alert_blocks += '<div class="alert-caution">⚠️ <b>ÇİFT SAVUNMA ÇÖKÜŞÜ (TEMKİNLİ OYUN FRENİ):</b> Her iki takımda da 2+ savunma eksiği var ➔ Karşılıklı xG şişirmesi kısıldı.</div>'
+
+    active_labels = set()
+    if kelly_taraf > 0:
+        active_labels.add(m1_taraf_pick)
+    if kelly_goal > 0:
+        active_labels.add(final_goal_pick)
+
+    radar_candidates = sorted(
+        [x for x in ev_list if x["ev"] >= 0.05 and x["label"] not in active_labels],
+        key=lambda x: x["ev"],
+        reverse=True,
+    )
+    if radar_candidates and (kelly_taraf == 0 or kelly_goal == 0):
+        top_r = radar_candidates[0]
+        radar_k = min(2.5, top_r["kelly"])
+        alert_blocks += (
+            f'<div class="alert-radar">💎 <b>SÜRPRİZ / DEĞER (+EV) RADARI:</b> Ana tercihler pas geçilirken Motor 4, '
+            f'<b>{top_r["label"]}</b> (Oran: <b>{top_r["mkt_odd"]:.2f}</b> | İhtimal: %{top_r["prob"]*100:.1f}) '
+            f'seçeneğinde <b>+%{top_r["ev_pct"]} +EV</b> tespit etti (Sürpriz Kasa: <b>%{radar_k:.1f}</b>).</div>'
+        )
+
+    true_conf = min(96, round((m1_taraf_conf + final_goal_conf + final_btts_conf) / 3))
+    taraf_k_str = f"<b>Kelly Kasa: %{kelly_taraf:.1f}</b>" if kelly_taraf > 0 else '<span style="color:#fbbf24;">Kelly Kasa: %0.0 (Pas Geç)</span>'
+    goal_k_str = f"<b>Kelly Kasa: %{kelly_goal:.1f}</b>" if kelly_goal > 0 else '<span style="color:#fbbf24;">Kelly Kasa: %0.0 (Pas Geç)</span>'
+    total_k_str = f"%{total_kelly:.1f}" if total_kelly > 0 else "%0.0 (PAS GEÇ - DEĞER ORANI YOK)"
+
+    st.markdown(
+        f"""
+        <div class="consensus-box">
+            <div class="consensus-title">👑 {home_team.upper()} - {away_team.upper()} 👑<br>
+            <span style="font-size:11px; color:#fff; font-weight:normal;">ÜÇLÜ SENTEZ MÜHRÜ (M1 + M2 + KELLY // BAREM {gl_str})</span></div>
+            📌 <b>1. Taraf Mührü:</b> {m1_taraf_pick} (Güven: %{m1_taraf_conf}) ➔ {taraf_k_str}<br>
+            ⚽ <b>2. Gol Mührü:</b> {final_goal_pick} (Net Güven: %{final_goal_conf}) ➔ {goal_k_str} {goal_badge}<br>
+            🔥 <b>3. KG Mührü:</b> {final_btts_pick} (Net Güven: %{final_btts_conf}) {btts_badge}<br>
+            ⏱️ <b>4. İlk Yarı Gol Mührü:</b> {final_ht05_pick} (Net Güven: %{final_ht05_conf})<br>
+            ⏳ <b>5. İlk Yarı Taraf Mührü:</b> {final_ht_pick} (Net Güven: %{final_ht_conf})<br>
+            🏆 <b>6. Nihai Skor Çifti:</b> {score_matrix[0]['home']}-{score_matrix[0]['away']} veya {score_matrix[1]['home']}-{score_matrix[1]['away']}
+            {alert_blocks}
+            <div class="seal-footer">
+                🔒 ÜÇLÜ KANTİTATİF GÜVEN MÜHRÜ: %{true_conf}<br>
+                💼 ÖNERİLEN TOPLAM OPTİMAL KASA RİSKİ (KELLY): {total_k_str}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
