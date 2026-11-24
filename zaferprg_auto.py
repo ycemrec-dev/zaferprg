@@ -1,13 +1,15 @@
 import io
+import os
 import math
 import re
 import unicodedata
+from datetime import datetime, timezone, timedelta
 import requests
 import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Zaferopta Quant Pro V36.1",
+    page_title="Zaferopta Quant Pro V37.0",
     page_icon="👑",
     layout="centered",
     initial_sidebar_state="collapsed",
@@ -77,6 +79,33 @@ CUSTOM_CSS = """
     .score-item .pr {
         font-size: 11px;
         color: #9ca3af;
+    }
+    .opta-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        margin-top: 6px;
+    }
+    .opta-table th {
+        background: #131b2e;
+        color: #14b8a6;
+        padding: 6px;
+        text-align: left;
+        border-bottom: 1px solid #1e293b;
+    }
+    .opta-table td {
+        padding: 6px;
+        border-bottom: 1px solid rgba(30, 41, 59, 0.7);
+        color: #f3f4f6;
+    }
+    .opta-badge {
+        background: #064e3b;
+        color: #00ff66;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: bold;
+        border: 1px solid #00ff66;
+        font-size: 10px;
     }
     .consensus-box {
         background: linear-gradient(135deg, #064e3b, #022c22);
@@ -157,10 +186,41 @@ CUSTOM_CSS = """
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+LEAGUE_OPTIONS = {
+    "🏆 Tüm Yaklaşan Maçlar (Genel Bülten)": "upcoming",
+    "🇪🇺 UEFA Şampiyonlar Ligi": "soccer_uefa_champs_league",
+    "🇪🇺 UEFA Avrupa Ligi": "soccer_uefa_europa_league",
+    "🇪🇺 UEFA Konferans Ligi": "soccer_uefa_europa_conference_league",
+    "🇹🇷 Türkiye Süper Lig": "soccer_turkey_super_league",
+    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 İngiltere Premier Lig": "soccer_epl",
+    "🏴󠁧󠁢󠁥󠁮󠁧󠁿 İngiltere Championship": "soccer_efl_champ",
+    "🇪🇸 İspanya La Liga": "soccer_spain_la_liga",
+    "🇪🇸 İspanya Segunda División": "soccer_spain_segunda_division",
+    "🇮🇹 İtalya Serie A": "soccer_italy_serie_a",
+    "🇮🇹 İtalya Serie B": "soccer_italy_serie_b",
+    "🇩🇪 Almanya Bundesliga": "soccer_germany_bundesliga",
+    "🇩🇪 Almanya 2. Bundesliga": "soccer_germany_bundesliga2",
+    "🇫🇷 Fransa Ligue 1": "soccer_france_ligue_one",
+    "🇫🇷 Fransa Ligue 2": "soccer_france_ligue_two",
+    "🇳🇱 Hollanda Eredivisie": "soccer_netherlands_eredivisie",
+    "🇵🇹 Portekiz Primeira Liga": "soccer_portugal_primeira_liga",
+    "🇧🇷 Brezilya Série A": "soccer_brazil_campeonato",
+    "🇺🇸 ABD MLS": "soccer_usa_mls",
+    "🇸🇪 İsveç Allsvenskan": "soccer_sweden_allsvenskan",
+    "🇳🇴 Norveç Eliteserien": "soccer_norway_eliteserien",
+}
+
 STOP_WORDS = {
     "fc", "fk", "sk", "sc", "cf", "ac", "as", "afc", "bc", "wba",
     "club", "clube", "sport", "spor", "kulubu", "calcio", "olympique", "de"
 }
+
+
+def get_secret_safe(key_name: str) -> str:
+    try:
+        return str(st.secrets.get(key_name, "")).strip()
+    except Exception:
+        return ""
 
 
 def norm_text(val) -> str:
@@ -348,6 +408,20 @@ def load_excel_archive(file_bytes: bytes):
         df = df[mask].reset_index(drop=True)
 
     return df, col_map
+
+
+def find_repo_excel_file() -> str:
+    try:
+        files = [
+            f for f in os.listdir(".")
+            if f.lower().endswith((".xlsx", ".xls")) and not f.startswith("~$")
+        ]
+        if files:
+            files.sort(key=lambda x: os.path.getsize(x), reverse=True)
+            return files[0]
+    except Exception:
+        pass
+    return ""
 
 
 def get_row_ms_score(row: pd.Series, col_map: dict):
@@ -662,16 +736,129 @@ def normalize_weights(raw_dict: dict) -> dict:
     return res
 
 
-def fetch_injuries_via_gemini(api_key: str, match_name: str):
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_odds_bulletin(api_key: str, sport_key: str):
+    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
+    params = {
+        "apiKey": api_key.strip(),
+        "regions": "eu,uk",
+        "markets": "h2h,totals",
+        "oddsFormat": "decimal",
+    }
+    resp = requests.get(url, params=params, timeout=20)
+    if resp.status_code == 401:
+        raise RuntimeError("The Odds API anahtarı geçersiz (HTTP 401).")
+    if resp.status_code == 429:
+        raise RuntimeError("The Odds API aylık kullanım kotası doldu (HTTP 429).")
+    if not resp.ok:
+        raise RuntimeError(f"Bülten çekilemedi (HTTP {resp.status_code}).")
+
+    raw_events = resp.json()
+    ist_tz = timezone(timedelta(hours=3))
+    now_utc = datetime.now(timezone.utc) - timedelta(hours=2)
+    events = []
+
+    for ev in raw_events:
+        home_t = str(ev.get("home_team", "")).strip()
+        away_t = str(ev.get("away_team", "")).strip()
+        if not home_t or not away_t:
+            continue
+
+        commence_str = ev.get("commence_time", "")
+        dt_label = ""
+        sort_ts = 0
+        try:
+            dt_utc = datetime.fromisoformat(commence_str.replace("Z", "+00:00"))
+            if dt_utc < now_utc:
+                continue
+            sort_ts = int(dt_utc.timestamp())
+            dt_ist = dt_utc.astimezone(ist_tz)
+            dt_label = dt_ist.strftime("%d.%m %H:%M")
+        except Exception:
+            dt_label = "--:--"
+
+        h2h_1, h2h_x, h2h_2 = [], [], []
+        totals_map = {}
+
+        for bm in ev.get("bookmakers", []):
+            for mkt in bm.get("markets", []):
+                m_key = mkt.get("key")
+                if m_key == "h2h":
+                    for out in mkt.get("outcomes", []):
+                        name = out.get("name", "")
+                        price = float(out.get("price", 0))
+                        if price <= 1.01:
+                            continue
+                        if name == home_t:
+                            h2h_1.append(price)
+                        elif name == away_t:
+                            h2h_2.append(price)
+                        elif name.lower() == "draw":
+                            h2h_x.append(price)
+                elif m_key == "totals":
+                    for out in mkt.get("outcomes", []):
+                        pt = out.get("point")
+                        price = float(out.get("price", 0))
+                        side = str(out.get("name", "")).lower()
+                        if pt is None or price <= 1.01:
+                            continue
+                        pt_key = f"{float(pt):.1f}"
+                        totals_map.setdefault(pt_key, {"over": [], "under": []})
+                        if side == "over":
+                            totals_map[pt_key]["over"].append(price)
+                        elif side == "under":
+                            totals_map[pt_key]["under"].append(price)
+
+        def avg_clean(lst):
+            return round(sum(lst) / len(lst), 2) if lst else 0.0
+
+        ms1 = avg_clean(h2h_1)
+        ms0 = avg_clean(h2h_x)
+        ms2 = avg_clean(h2h_2)
+
+        parsed_totals = {}
+        for pt_k, sides in totals_map.items():
+            parsed_totals[pt_k] = {
+                "over": avg_clean(sides["over"]),
+                "under": avg_clean(sides["under"]),
+            }
+
+        sport_title = ev.get("sport_title", "")
+        odds_preview = f"1:{ms1:.2f} X:{ms0:.2f} 2:{ms2:.2f}" if ms1 > 0 else "Oran bekleniyor"
+        label = f"[{dt_label}] {home_t} - {away_t} ({odds_preview}) • {sport_title}"
+
+        events.append({
+            "id": ev.get("id", f"{home_t}_{away_t}"),
+            "label": label,
+            "match_name": f"{home_t} - {away_t}",
+            "home_team": home_t,
+            "away_team": away_t,
+            "sort_ts": sort_ts,
+            "ms1": ms1,
+            "ms0": ms0,
+            "ms2": ms2,
+            "totals": parsed_totals,
+        })
+
+    events.sort(key=lambda x: x["sort_ts"])
+    return events
+
+
+def fetch_match_context_via_gemini(api_key: str, match_name: str):
     prompt = (
-        f"{match_name} futbol maçı için her iki takımın bugünkü güncel sakat ve cezalı İLK 11 oyuncularını "
-        "internetten araştır. Uzun süreli veya yedek oyuncuları yazma. Stoper, bek, kaleci ve kilit oyun kurucu "
-        "mevkilerini ayrı ve net belirt. Eğer yerine ilk 11'de geçecek yedek oyuncunun güncel SofaScore/WhoScored "
-        "sezon puanını gerçek kaynakta bulabiliyorsan ve 6.50 altındaysa oyuncunun yanına puanı ekle "
-        "(örn: Lacroix stoper 6.3); gerçek puan bulamazsan kesinlikle tahmin etme ve sayı yazma. "
-        "Sadece şu 2 satır formatında kısa cevap ver:\n"
-        "EV: [eksik oyuncular ve mevkileri, yoksa Yok]\n"
-        "DEP: [eksik oyuncular ve mevkileri, yoksa Yok]"
+        f"{match_name} futbol maçı için bugünkü iki veriyi internetten tek seferde araştır:\n"
+        "1) Her iki takımın bugünkü güncel sakat ve cezalı İLK 11 oyuncularını bul (uzun süreli veya yedekleri yazma; "
+        "stoper, bek, kaleci, kilit orta saha, forvet, kanat mevkilerini mutlaka belirt; yerine oynayacak yedeğin "
+        "SofaScore/WhoScored sezon puanı 6.50 altındaysa yanına puanı yaz örn: Lacroix stoper 6.3, bulamazsan sayı yazma).\n"
+        "2) Her iki takımın bu sezonki güncel maç başı beklenen gol (Attack xG) ve beklenen yenen gol (Defence xGA) "
+        "ortalamalarını (Goaloo / FootyStats / Understat verilerine göre) bul.\n"
+        "Kesinlikle açıklama yapma, sadece şu 6 satır formatında kısa cevap ver:\n"
+        "EV_SAKAT: [oyuncular ve mevkileri, yoksa Yok]\n"
+        "DEP_SAKAT: [oyuncular ve mevkileri, yoksa Yok]\n"
+        "EV_XG: [örn: 1.45]\n"
+        "EV_XGA: [örn: 1.12]\n"
+        "DEP_XG: [örn: 1.30]\n"
+        "DEP_XGA: [örn: 1.25]"
     )
 
     def call_model(model_name: str, use_search: bool):
@@ -719,122 +906,255 @@ def fetch_injuries_via_gemini(api_key: str, match_name: str):
 
     if resp is None or not resp.ok:
         code = resp.status_code if resp is not None else "Bağlantı"
-        raise RuntimeError(f"API Hatası (HTTP {code})")
+        if code == 429:
+            raise RuntimeError("Gemini API kotası doldu (HTTP 429). 1 dakika bekleyip tekrar deneyin.")
+        raise RuntimeError(f"Gemini API Hatası (HTTP {code})")
 
     data = resp.json()
     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     text = "\n".join(p.get("text", "") for p in parts)
 
-    ev_match = re.search(r"EV:\s*(.+)", text, re.IGNORECASE)
-    dep_match = re.search(r"DEP:\s*(.+)", text, re.IGNORECASE)
-    ev_txt = ev_match.group(1).replace("*", "").strip() if ev_match else ""
-    dep_txt = dep_match.group(1).replace("*", "").strip() if dep_match else ""
+    def extract_line(tag: str) -> str:
+        m = re.search(rf"{tag}\s*:\s*(.+)", text, re.IGNORECASE)
+        return m.group(1).replace("*", "").strip() if m else ""
 
-    if ev_txt.lower() == "yok":
-        ev_txt = ""
-    if dep_txt.lower() == "yok":
-        dep_txt = ""
+    def extract_float(tag: str) -> float:
+        raw = extract_line(tag)
+        m = re.search(r"(\d+[.,]\d+)", raw)
+        if m:
+            val = float(m.group(1).replace(",", "."))
+            if 0.30 <= val <= 4.50:
+                return round(val, 2)
+        return 0.0
 
-    return ev_txt, dep_txt, used_model
+    ev_sakat = extract_line("EV_SAKAT")
+    dep_sakat = extract_line("DEP_SAKAT")
+    if ev_sakat.lower() == "yok":
+        ev_sakat = ""
+    if dep_sakat.lower() == "yok":
+        dep_sakat = ""
+
+    return {
+        "ev_sakat": ev_sakat,
+        "dep_sakat": dep_sakat,
+        "ev_xg": extract_float("EV_XG"),
+        "ev_xga": extract_float("EV_XGA"),
+        "dep_xg": extract_float("DEP_XG"),
+        "dep_xga": extract_float("DEP_XGA"),
+        "model": used_model,
+    }
 
 
+def apply_event_odds_to_state(ev_obj: dict, goal_line: float):
+    st.session_state["match_input_val"] = ev_obj["match_name"]
+    st.session_state["odd_ms1_val"] = float(ev_obj["ms1"])
+    st.session_state["odd_ms0_val"] = float(ev_obj["ms0"])
+    st.session_state["odd_ms2_val"] = float(ev_obj["ms2"])
+    gl_key = f"{goal_line:.1f}"
+    totals = ev_obj.get("totals", {})
+    if gl_key in totals:
+        st.session_state["odd_over_val"] = float(totals[gl_key]["over"])
+        st.session_state["odd_under_val"] = float(totals[gl_key]["under"])
+    else:
+        st.session_state["odd_over_val"] = 0.0
+        st.session_state["odd_under_val"] = 0.0
+
+
+# --- SESSION STATE BAŞLATMA ---
+defaults = {
+    "odds_api_key_val": get_secret_safe("ODDS_API_KEY"),
+    "gemini_api_key_val": get_secret_safe("GEMINI_API_KEY"),
+    "bulletin_events": [],
+    "selected_event_id": "",
+    "match_input_val": "",
+    "home_inj_val": "",
+    "away_inj_val": "",
+    "g_home_xg_val": 0.0,
+    "g_home_xga_val": 0.0,
+    "g_away_xg_val": 0.0,
+    "g_away_xga_val": 0.0,
+    "odd_ms1_val": 0.0,
+    "odd_ms0_val": 0.0,
+    "odd_ms2_val": 0.0,
+    "goal_line_val": 2.5,
+    "odd_over_val": 0.0,
+    "odd_under_val": 0.0,
+    "auto_run_trigger": False,
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# --- BAŞLIK ---
 st.markdown(
     """
     <div class="z-header">
         <h1>ZAFEROPTA QUANT PRO</h1>
-        <p>V36.1 // Omurga Çöküşü + Kilit Oyun Kurucu + +EV Radarı (Python)</p>
+        <p>V37.0 // Tam Otomatik Bülten + Sakat/xG + Omurga & +EV Radarı</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-if "home_inj_val" not in st.session_state:
-    st.session_state["home_inj_val"] = ""
-if "away_inj_val" not in st.session_state:
-    st.session_state["away_inj_val"] = ""
-
-uploaded_file = st.file_uploader("1. 75 SÜTUNLU ARŞİV EXCEL (.XLSX)", type=["xlsx", "xls"])
+# --- 1. EXCEL ARŞİV (DEPODAN OTOMATİK + OPSİYONEL YÜKLEME) ---
+repo_excel_path = find_repo_excel_file()
 df_archive = None
 col_map = None
 
+with st.expander("📂 1. 75 SÜTUNLU EXCEL ARŞİV DURUMU", expanded=(repo_excel_path == "")):
+    uploaded_file = st.file_uploader("Farklı bir Excel arşivi yüklemek isterseniz seçin (.xlsx)", type=["xlsx", "xls"])
+
 if uploaded_file is not None:
     df_archive, col_map = load_excel_archive(uploaded_file.getvalue())
-    if df_archive is not None:
-        ms_lbl = col_map["ms_score"] or (
-            f"{col_map['home_goal']}/{col_map['away_goal']}" if col_map["home_goal"] else "YOK"
-        )
-        st.success(
-            f"✔ {len(df_archive)} satırlık arşiv yüklendi | "
-            f"Ev: [{col_map['home'] or 'YOK'}] | Dep: [{col_map['away'] or 'YOK'}] | "
-            f"MS: [{ms_lbl}] | İY: [{col_map['ht_score'] or 'YOK'}]"
-        )
+    excel_source_name = uploaded_file.name
+elif repo_excel_path:
+    with open(repo_excel_path, "rb") as f:
+        df_archive, col_map = load_excel_archive(f.read())
+    excel_source_name = repo_excel_path
+else:
+    excel_source_name = ""
+
+if df_archive is not None:
+    ms_lbl = col_map["ms_score"] or (
+        f"{col_map['home_goal']}/{col_map['away_goal']}" if col_map["home_goal"] else "YOK"
+    )
+    st.success(
+        f"✔ Arşiv Hazır: **{excel_source_name}** ({len(df_archive)} maç) | "
+        f"Ev: [{col_map['home'] or 'YOK'}] | Dep: [{col_map['away'] or 'YOK'}] | MS: [{ms_lbl}]"
+    )
+else:
+    st.warning("⚠️ GitHub deposunda henüz `.xlsx` arşiv dosyası bulunamadı. Yukarıdan yükleyebilir veya depoya ekleyebilirsiniz.")
+
+# --- API ANAHTARLARI ---
+keys_missing = (not st.session_state["odds_api_key_val"]) or (not st.session_state["gemini_api_key_val"])
+with st.expander("🔑 API ANAHTARLARI (THE ODDS API & GEMINI API)", expanded=keys_missing):
+    st.text_input("The Odds API Anahtarı (Bülten & Canlı Oranlar)", type="password", key="odds_api_key_val")
+    st.text_input("Google AI Studio Gemini Anahtarı (Sakat/Cezalı & xG)", type="password", key="gemini_api_key_val")
+
+# --- 2. OTOMATİK GÜNLÜK MAÇ BÜLTENİ ---
+st.markdown("### 📅 2. OTOMATİK MAÇ BÜLTENİ & CANLI ORAN SEÇİMİ")
+selected_league_label = st.selectbox("Lig / Bülten Seçin", list(LEAGUE_OPTIONS.keys()), index=0)
+selected_sport_key = LEAGUE_OPTIONS[selected_league_label]
+
+if st.button("📡 GÜNÜN BÜLTENİNİ VE CANLI ORANLARI ÇEK", use_container_width=True):
+    if not st.session_state["odds_api_key_val"].strip():
+        st.warning("Önce yukarıdaki API Anahtarları bölümüne The Odds API anahtarınızı girin.")
     else:
-        st.error("Excel başlık satırı algılanamadı.")
+        try:
+            with st.spinner("Canlı maç bülteni ve büro oranları çekiliyor..."):
+                evs = fetch_odds_bulletin(st.session_state["odds_api_key_val"], selected_sport_key)
+                st.session_state["bulletin_events"] = evs
+                if evs:
+                    st.session_state["selected_event_id"] = evs[0]["id"]
+                    apply_event_odds_to_state(evs[0], st.session_state["goal_line_val"])
+                    st.success(f"✔ Bültende {len(evs)} aktif maç bulundu ve oranlar yüklendi.")
+                else:
+                    st.info("Bu ligde şu an açık bülten maçı bulunamadı; 'Tüm Yaklaşan Maçlar'ı deneyin.")
+        except Exception as exc:
+            st.error(f"❌ {exc}")
 
-match_input = st.text_input("2. MAÇ ANALİZİ (EV SAHİBİ - DEPLASMAN)", placeholder="Örn: Galatasaray - Aston Villa")
+events_list = st.session_state["bulletin_events"]
+selected_event_obj = None
 
-with st.expander("🤖 CANLI SAKAT & CEZALI TARAMA (GEMINI API)", expanded=False):
-    api_key_input = st.text_input("Google AI Studio API Anahtarı", type="password")
-    if st.button("🔍 SAKAT / CEZALILARI İNTERNETTEN TARA", use_container_width=True):
-        if not api_key_input.strip():
-            st.warning("Önce API anahtarını girin.")
-        elif "-" not in match_input:
-            st.warning("Maç adını 'Ev Sahibi - Deplasman' formatında yazın.")
-        else:
-            try:
-                with st.spinner("İlk 11 sakat/cezalıları taranıyor..."):
-                    ev_res, dep_res, model_used = fetch_injuries_via_gemini(api_key_input, match_input)
-                    st.session_state["home_inj_val"] = ev_res
-                    st.session_state["away_inj_val"] = dep_res
-                    st.success(f"✔ Tarama tamamlandı ({model_used}) ve kutulara işlendi.")
-            except Exception as exc:
-                st.error(f"❌ {exc}")
+if events_list:
+    label_to_ev = {ev["label"]: ev for ev in events_list}
+    labels = list(label_to_ev.keys())
+    cur_idx = 0
+    for i, ev in enumerate(events_list):
+        if ev["id"] == st.session_state["selected_event_id"]:
+            cur_idx = i
+            break
+    chosen_label = st.selectbox("Bültenden Maç Seçin (Oranlar Otomatik Dolar)", labels, index=cur_idx)
+    selected_event_obj = label_to_ev[chosen_label]
+    if selected_event_obj["id"] != st.session_state["selected_event_id"]:
+        st.session_state["selected_event_id"] = selected_event_obj["id"]
+        apply_event_odds_to_state(selected_event_obj, st.session_state["goal_line_val"])
 
-home_injuries = st.text_input(
-    "3. EV SAHİBİ SAKAT / CEZALI OYUNCULAR",
-    key="home_inj_val",
-    placeholder="Örn: Victor Osimhen kilit forvet, Rafael Leao kilit kanat, Ismail Jakobs bek",
+match_input = st.text_input(
+    "Seçili Maç (Ev Sahibi - Deplasman)",
+    key="match_input_val",
+    placeholder="Bültenden seçin veya elle yazın: Galatasaray - Aston Villa",
 )
-away_injuries = st.text_input(
-    "4. DEPLASMAN SAKAT / CEZALI OYUNCULAR",
-    key="away_inj_val",
-    placeholder="Örn: Matty Cash bek, Matteo Ruggeri bek",
-)
 
-st.markdown("**5. GOALOO XG & XGA MANUEL GİRİŞİ (OPSİYONEL)**")
-c_g1, c_g2 = st.columns(2)
-with c_g1:
-    g_home_xg = st.number_input("Ev Attack xG", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
-    g_away_xg = st.number_input("Dep Attack xG", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
-with c_g2:
-    g_home_xga = st.number_input("Ev Defence xGA", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
-    g_away_xga = st.number_input("Dep Defence xGA", min_value=0.0, max_value=10.0, value=0.0, step=0.01)
+# --- TEK TUŞLA TAM OTOMATİK VERİ ÇEKME + ANALİZ ---
+if st.button("⚡ SAKAT/CEZALI + xG VERİLERİNİ ÇEK VE 12 MOTORU ÇALIŞTIR", type="primary", use_container_width=True):
+    if "-" not in st.session_state["match_input_val"]:
+        st.error("Lütfen önce bültenden bir maç seçin veya 'Ev Sahibi - Deplasman' yazın.")
+    elif not st.session_state["gemini_api_key_val"].strip():
+        st.warning("Gemini API anahtarı girilmedi; mevcut kutulardaki verilerle motorlar çalıştırılıyor.")
+        st.session_state["auto_run_trigger"] = True
+    else:
+        try:
+            with st.spinner("Sakat/cezalı ilk 11'ler ve takım xG/xGA verileri çekiliyor..."):
+                ctx = fetch_match_context_via_gemini(
+                    st.session_state["gemini_api_key_val"],
+                    st.session_state["match_input_val"],
+                )
+                st.session_state["home_inj_val"] = ctx["ev_sakat"]
+                st.session_state["away_inj_val"] = ctx["dep_sakat"]
+                if ctx["ev_xg"] > 0:
+                    st.session_state["g_home_xg_val"] = ctx["ev_xg"]
+                if ctx["ev_xga"] > 0:
+                    st.session_state["g_home_xga_val"] = ctx["ev_xga"]
+                if ctx["dep_xg"] > 0:
+                    st.session_state["g_away_xg_val"] = ctx["dep_xg"]
+                if ctx["dep_xga"] > 0:
+                    st.session_state["g_away_xga_val"] = ctx["dep_xga"]
+                st.session_state["auto_run_trigger"] = True
+                st.success(f"✔ Canlı kadro ve xG verileri ({ctx['model']}) kutulara işlendi!")
+        except Exception as exc:
+            st.error(f"❌ {exc}")
 
-st.markdown("**6. GÜNCEL PİYASA ORANLARI & GOL BAREMİ (+EV & KELLY)**")
-c_o1, c_o2, c_o3 = st.columns(3)
-with c_o1:
-    odd_ms1 = st.number_input("MS 1", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
-with c_o2:
-    odd_ms0 = st.number_input("MS 0", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
-with c_o3:
-    odd_ms2 = st.number_input("MS 2", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
+# --- 3, 4, 5, 6. BÖLÜMLER (OTOMATİK DOLAN VE DÜZENLENEBİLİR KUTULAR) ---
+with st.expander("🛠️ 3-6. BÖLÜMLER: OTOMATİK DOLAN KADRO, xG & ORAN KUTULARI", expanded=True):
+    home_injuries = st.text_input("3. Ev Sahibi Sakat / Cezalı", key="home_inj_val")
+    away_injuries = st.text_input("4. Deplasman Sakat / Cezalı", key="away_inj_val")
 
-c_b1, c_b2, c_b3 = st.columns(3)
-with c_b1:
-    goal_line = st.selectbox("Gol Baremi", [1.5, 2.5, 3.5, 4.5], index=1)
-with c_b2:
-    odd_over = st.number_input(f"{goal_line:.1f} ÜST", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
-with c_b3:
-    odd_under = st.number_input(f"{goal_line:.1f} ALT", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
+    st.markdown("**5. Attack xG & Defence xGA**")
+    c_g1, c_g2 = st.columns(2)
+    with c_g1:
+        g_home_xg = st.number_input("Ev Attack xG", min_value=0.0, max_value=10.0, step=0.01, key="g_home_xg_val")
+        g_away_xg = st.number_input("Dep Attack xG", min_value=0.0, max_value=10.0, step=0.01, key="g_away_xg_val")
+    with c_g2:
+        g_home_xga = st.number_input("Ev Defence xGA", min_value=0.0, max_value=10.0, step=0.01, key="g_home_xga_val")
+        g_away_xga = st.number_input("Dep Defence xGA", min_value=0.0, max_value=10.0, step=0.01, key="g_away_xga_val")
 
-if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_container_width=True):
+    st.markdown("**6. Canlı Piyasa Oranları & Gol Baremi**")
+    c_o1, c_o2, c_o3 = st.columns(3)
+    with c_o1:
+        odd_ms1 = st.number_input("MS 1", min_value=0.0, max_value=100.0, step=0.01, key="odd_ms1_val")
+    with c_o2:
+        odd_ms0 = st.number_input("MS 0", min_value=0.0, max_value=100.0, step=0.01, key="odd_ms0_val")
+    with c_o3:
+        odd_ms2 = st.number_input("MS 2", min_value=0.0, max_value=100.0, step=0.01, key="odd_ms2_val")
+
+    c_b1, c_b2, c_b3 = st.columns(3)
+    with c_b1:
+        prev_gl = st.session_state["goal_line_val"]
+        goal_line = st.selectbox("Gol Baremi", [1.5, 2.5, 3.5, 4.5], key="goal_line_val")
+        if goal_line != prev_gl and selected_event_obj is not None:
+            gl_k = f"{goal_line:.1f}"
+            t_map = selected_event_obj.get("totals", {})
+            if gl_k in t_map:
+                st.session_state["odd_over_val"] = float(t_map[gl_k]["over"])
+                st.session_state["odd_under_val"] = float(t_map[gl_k]["under"])
+    with c_b2:
+        odd_over = st.number_input(f"{goal_line:.1f} ÜST", min_value=0.0, max_value=100.0, step=0.01, key="odd_over_val")
+    with c_b3:
+        odd_under = st.number_input(f"{goal_line:.1f} ALT", min_value=0.0, max_value=100.0, step=0.01, key="odd_under_val")
+
+manual_run = st.button("👑 MEVCUT KUTULARLA MOTORLARI YENİDEN HESAPLA", use_container_width=True)
+
+if st.session_state["auto_run_trigger"] or manual_run:
+    st.session_state["auto_run_trigger"] = False
+
     if "-" not in match_input:
         st.error("Lütfen maç adını araya tire (-) koyarak girin! (Örn: Galatasaray - Aston Villa)")
         st.stop()
 
     has_goaloo = (g_home_xg > 0 and g_home_xga > 0 and g_away_xg > 0 and g_away_xga > 0)
     if (df_archive is None or df_archive.empty) and not has_goaloo:
-        st.error("Lütfen 1. bölümden Excel arşivini yükleyin VEYA 5. bölümden Goaloo xG/xGA değerlerini girin!")
+        st.error("Excel arşivi yüklenmemiş ve xG/xGA değerleri boş. Arşivi ekleyin veya xG verilerini çekin.")
         st.stop()
 
     parts = match_input.split("-", 1)
@@ -850,7 +1170,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     away_stats = calc_team_stats(df_archive, col_map, away_indices, a_strict, a_qnorm, a_qcore)
 
     if not home_stats and not away_stats and not has_goaloo:
-        st.warning(f"'{home_team}' ve '{away_team}' Excel arşivinde bulunamadı ve Goaloo xG girilmedi.")
+        st.warning(f"'{home_team}' ve '{away_team}' Excel arşivinde bulunamadı ve xG/xGA verisi boş.")
         st.stop()
 
     h_inj = analyze_injury_text(home_injuries)
@@ -877,6 +1197,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
         base_home_xg = excel_home_xg if excel_home_xg is not None else 1.35
         base_away_xg = excel_away_xg if excel_away_xg is not None else 1.05
 
+    # V36.1 / V37.0: SAVUNMA ÇÖKÜŞÜ + OMURGA ÇÖKÜŞÜ + NET İLK 11 EKSİK FARKI
     h_net_missing = h_inj["starter_count"] - a_inj["starter_count"]
     a_net_missing = a_inj["starter_count"] - h_inj["starter_count"]
 
@@ -917,6 +1238,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     base_home_xg = max(0.30, base_home_xg * (1.0 - h_inj["att_pen"]) * home_gap_drag * home_boost_mult * caution_factor)
     base_away_xg = max(0.25, base_away_xg * (1.0 - a_inj["att_pen"]) * away_gap_drag * away_boost_mult * caution_factor)
 
+    # MOTOR 1: 8x8 DIXON-COLES MATRİSİ (rho = -0.13)
     rho = -0.13
     score_matrix = []
     total_prob = 0.0
@@ -959,6 +1281,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     m1_over35_pct = round(m1_over35 * 100)
     m1_over45_pct = round(m1_over45 * 100)
 
+    # İLK YARI DIXON-COLES
     ht_home_xg = base_home_xg * 0.44
     ht_away_xg = base_away_xg * 0.44
     p_ht1 = p_htx = p_ht2 = p_ht_over05 = ht_tot_prob = 0.0
@@ -991,6 +1314,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     m1_taraf_prob = max(p_home_win, p_draw, p_away_win)
     m1_taraf_conf = round(m1_taraf_prob * 100)
 
+    # MOTOR 2: ARŞİV HESAPLARI
     over_sel_cnt = over25_cnt = over35_cnt = over45_cnt = btts_cnt = valid_rows = 0
     ht05_cnt = ht1_cnt = htx_cnt = ht2_cnt = valid_ht_rows = 0
 
@@ -1032,10 +1356,8 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     m2_ht1_pct = round((ht1_cnt / valid_ht_rows) * 100) if valid_ht_rows > 0 else m1_ht1_pct
     m2_htx_pct = round((htx_cnt / valid_ht_rows) * 100) if valid_ht_rows > 0 else m1_htx_pct
     m2_ht2_pct = max(0, 100 - m2_ht1_pct - m2_htx_pct) if valid_ht_rows > 0 else m1_ht2_pct
-    m2_ht_taraf = "İY 1" if (m2_ht1_pct >= m2_htx_pct and m2_ht1_pct >= m2_ht2_pct) else (
-        "İY 2" if (m2_ht2_pct >= m2_htx_pct and m2_ht2_pct > m2_ht1_pct) else "İY X"
-    )
 
+    # MOTOR 3 & 4: ADİL ORAN & +EV
     KELLY_CAP = 5.0
 
     def check_ev(label: str, prob: float, mkt_odd: float):
@@ -1063,6 +1385,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     ev_under = check_ev(f"{gl_str} ALT", m1_sel_under, odd_under)
     ev_list = [x for x in (ev1, ev0, ev2, ev_over, ev_under) if x is not None]
 
+    # MOTOR 6: ASYA HANDİKAP
     p_ah_hm05 = sum(s["prob"] for s in score_matrix if (s["home"] - s["away"]) >= 1)
     p_ah_am05 = sum(s["prob"] for s in score_matrix if (s["home"] - s["away"]) <= -1)
     p_ah_ap05 = sum(s["prob"] for s in score_matrix if (s["home"] - s["away"]) <= 0)
@@ -1077,6 +1400,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
         best_ah_prob = p_ah_ap05
         best_ah = f"{away_team} +0.5 AH (%{round(p_ah_ap05 * 100)})"
 
+    # MOTOR 12: GOALOO ANALİZİ
     h_xg_val = g_home_xg if has_goaloo else (home_stats["avg_scored"] if home_stats else 1.40)
     h_xga_val = g_home_xga if has_goaloo else (home_stats["avg_conceded"] if home_stats else 1.15)
     a_xg_val = g_away_xg if has_goaloo else (away_stats["avg_scored"] if away_stats else 1.20)
@@ -1105,6 +1429,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     m12_goal_res = f"{gl_str} ÜST" if m5_sel_over_pct >= 50 else f"{gl_str} ALT"
     m12_btts_res = "KG VAR" if (adj_ev_gol >= 0.95 and adj_dep_gol >= 0.85) else "KG YOK"
 
+    # MOTOR 11: DİNAMİK 5 KATMANLI SENTEZ
     form_gap = abs(f_state_h - f_state_a)
     def_inj_imp = (h_inj["def_starter_count"] + a_inj["def_starter_count"]) * 4.5 + (5 if h_inj["def_collapse"] else 0) + (5 if a_inj["def_collapse"] else 0)
     bb_imp = (6 if h_backbone_collapse else 0) + (6 if a_backbone_collapse else 0)
@@ -1141,6 +1466,15 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     final_goal_conf = final_sel_over_pct if final_sel_over_pct >= 50 else (100 - final_sel_over_pct)
     goal_agree = (m1_sel_over_pct >= 50 and m2_sel_over_pct >= 50) or (m1_sel_over_pct < 50 and m2_sel_over_pct < 50)
 
+    k3_dir = "Ev Formda" if f_state_h >= f_state_a else "Dep Formda"
+    if single_home_collapse or single_home_backbone or (not both_def_collapse and h_net_missing >= 2):
+        k3_dir = "Dep Avantaj"
+    elif single_away_collapse or single_away_backbone or (not both_def_collapse and a_net_missing >= 2):
+        k3_dir = "Ev Avantaj"
+    elif both_def_collapse:
+        k3_dir = "Temkinli"
+
+    # MOTOR 10: YÖN UYUMLU VE GÜVEN TAVANLI KELLY KASA
     picked_taraf_ev = ev1 if m1_taraf_pick == "MS 1" else (ev2 if m1_taraf_pick == "MS 2" else ev0)
     if picked_taraf_ev:
         kelly_taraf = picked_taraf_ev["kelly"]
@@ -1167,6 +1501,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
 
     total_kelly = kelly_taraf + kelly_goal
 
+    # ÜÇLÜ SENTEZ MÜHRÜ
     btts_w1 = (dyn_w["w1"] + dyn_w["w3"] + dyn_w["w5"]) if m2_has_data else 100
     btts_w2 = (dyn_w["w2"] + dyn_w["w4"]) if m2_has_data else 0
     final_btts_pct = round((m1_btts_pct * btts_w1 + m2_btts_pct * btts_w2) / (btts_w1 + btts_w2))
@@ -1186,6 +1521,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
     )
     final_ht_conf = max(final_ht1, final_htx, final_ht2)
 
+    # --- SONUÇ KARTLARI ---
     top_scores_html = "".join(
         f'<div class="score-item"><div class="sc">{s["home"]}-{s["away"]}</div><div class="pr">%{s["prob"]*100:.1f}</div></div>'
         for s in score_matrix[:6]
@@ -1211,7 +1547,7 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
         <div class="engine-card" style="border-left-color:#00ff66;">
             <h4>Motor 2: Excel Arşiv & İç/Dış Saha Sonuçları</h4>
             <b>{home_label or home_team}</b> ({len(home_indices)} maç) & <b>{away_label or away_team}</b> ({len(away_indices)} maç) ➔ <b>{valid_rows}</b> gerçek MS skoru<br>
-            • <b>{gl_str} Üst:</b> %{m2_sel_over_pct} | <b>2.5 Üst:</b> %{m2_over25_pct} | <b>KG Var:</b> %{m2_btts_pct} | <b>İY 0.5 Üst:</b> %{m2_ht05_pct}
+            • <b>{gl_str} Üst:</b> %{m2_sel_over_pct} | <b>2.5 Üst:</b> %{m2_over25_pct} | <b>3.5 Üst:</b> %{m2_over35_pct} | <b>KG Var:</b> %{m2_btts_pct} | <b>İY 0.5 Üst:</b> %{m2_ht05_pct}
         </div>
         """,
         unsafe_allow_html=True,
@@ -1247,7 +1583,24 @@ if st.button("👑 TÜM MOTORLARI VE MÜHRÜ ÇALIŞTIR", type="primary", use_co
             <h4>Motor 5, 6, 7, 8, 9 & 12: Kadro, Handikap & Goaloo Özeti</h4>
             🏥 <b>{home_team}:</b> {h_inj['note']} | EWMA: %{f_state_h}<br>
             🏥 <b>{away_team}:</b> {a_inj['note']} | EWMA: %{f_state_a}<br>
-            ⚖️ <b>Asya Handikap:</b> {best_ah} | <b>Goaloo Düzeltilmiş Gol:</b> {beklenen_gol:.2f} (Ham: {raw_beklenen_gol:.2f}) | <b>M12:</b> {m12_taraf} / {m12_goal_res} / {m12_btts_res}
+            ⚖️ <b>Asya Handikap:</b> {best_ah} | <b>Düzeltilmiş Gol:</b> {beklenen_gol:.2f} (Ham: {raw_beklenen_gol:.2f}) | <b>M12:</b> {m12_taraf} / {m12_goal_res} / {m12_btts_res}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="engine-card" style="border-left-color:#14b8a6;">
+            <h4>Motor 11: Dinamik 5 Katmanlı Opta Sentez Matrisi</h4>
+            <table class="opta-table">
+                <tr><th>Modül</th><th>Bulgu</th><th>Yön</th><th>Ağırlık</th></tr>
+                <tr><td>1) Dixon-Coles</td><td>Ev {base_home_xg:.2f} - Dep {base_away_xg:.2f}</td><td><span class="opta-badge">{m1_taraf_pick}</span></td><td>%{dyn_w['w1']}</td></tr>
+                <tr><td>2) Excel Arşiv</td><td>{valid_rows} maç ({gl_str}Ü %{m2_sel_over_pct})</td><td><span class="opta-badge">{gl_str} {'ÜST' if m2_sel_over_pct >= 50 else 'ALT'}</span></td><td>%{dyn_w['w2']}</td></tr>
+                <tr><td>3) Kadro & Omurga</td><td>EWMA %{f_state_h} vs %{f_state_a}</td><td><span class="opta-badge">{k3_dir}</span></td><td>%{dyn_w['w3']}</td></tr>
+                <tr><td>4) Asya Handikap</td><td>{best_ah}</td><td><span class="opta-badge">AH Onay</span></td><td>%{dyn_w['w4']}</td></tr>
+                <tr><td>5) Goaloo Çapraz</td><td>Gol: {beklenen_gol:.2f} ({gl_str}Ü %{m5_sel_over_pct})</td><td><span class="opta-badge">{m12_goal_res}</span></td><td>%{dyn_w['w5']}</td></tr>
+            </table>
         </div>
         """,
         unsafe_allow_html=True,
